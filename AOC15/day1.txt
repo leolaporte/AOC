@@ -1,0 +1,83 @@
+#lang racket
+;  AOC 2015
+; Day 1
+; Leo Laporte 26-Nov-21
+; 
+; --- Part One ---
+; 
+; Santa is trying to deliver presents in a large apartment building, but he can't find the right floor -
+; the directions he got are a little confusing. He starts on the ground floor (floor 0) and then follows
+; the instructions one character at a time.
+; 
+; An opening parenthesis, (, means he should go up one floor, and a closing parenthesis, ), means he
+; should go down one floor.
+; 
+; The apartment building is very tall, and the basement is very deep; he will never find the top or
+; bottom floors.
+; 
+; For example:
+; 
+; (()) and ()() both result in floor 0.
+; ((( and (()(()( both result in floor 3.
+; ))((((( also results in floor 3.
+; ()) and ))( both result in floor -1 (the first basement level).
+; ))) and )())()) both result in floor -3.
+;                 
+; To what floor do the instructions take Santa?
+
+
+(require racket/file)
+
+;; Problem input from adventofcode.com
+(define floors (file->string "input1.txt"))
+
+(define (destination flrs)
+  (local ((define flr-lst (string->list flrs))) ; convert the string to a list of moves
+    (- (count-char '#\( flr-lst) (count-char '#\) flr-lst))))
+
+(module+ test
+  (require rackunit)
+  (check-equal? (destination "(())") 0)
+  (check-equal? (destination "()()") 0)
+  (check-equal? (destination "(((") 3)
+  (check-equal? (destination "(()(()(") 3)
+  (check-equal? (destination "))(((((") 3)
+  (check-equal? (destination "())") -1)
+  (check-equal? (destination "))(") -1)
+  (check-equal? (destination ")))") -3)
+  (check-equal? (destination ")())())") -3))
+
+(define (count-char c lst)
+  (cond ((empty? lst) 0)
+        (else (+ (if (equal? c (first lst)) 1 0) (count-char c (rest lst))))))
+
+(time (printf "2015 AOC Problem 1.1 = ~a\n" (destination floors)))
+
+;  --- Part Two ---
+; 
+; Now, given the same instructions, find the position of the first character that causes him to
+; enter the basement (floor -1). The first character in the instructions has position 1, the
+; second character has position 2, and so on.
+; 
+; For example:
+; 
+; ) causes him to enter the basement at character position 1.
+; ()()) causes him to enter the basement at character position 5.
+; What is the position of the character that causes Santa to first enter the basement?
+
+
+(define (moves-to-basement flr-string)
+  (local ((define (next-move flr index moves)
+           (cond ((equal? flr -1) index)
+                 ((empty? moves) #false)
+                 (else (next-move 
+                         (+ (if (equal? '#\( (first moves)) 1 -1) flr)
+                         (+ index 1)
+                         (rest moves))))))
+  (next-move 0 0 (string->list flr-string))))
+
+(module+ test
+  (check-equal? (moves-to-basement ")") 1)
+  (check-equal? (moves-to-basement "()())") 5))
+
+(time (printf "2015 AOC Problem 1.2 = ~a\n" (moves-to-basement floors)))
