@@ -1,0 +1,104 @@
+#lang racket
+;  AOC 2015
+; Day 3
+; Leo Laporte, 27 Nov 2021
+; 
+; --- Part One ---
+; 
+; Perfectly Spherical Houses in a Vacuum 
+; 
+; Santa is delivering presents to an infinite two-dimensional grid of houses.
+; 
+; He begins by delivering a present to the house at his starting location, and then an elf at the
+; North Pole calls him via radio and tells him where to move next. Moves are always exactly one house
+; to the north (^), south (v), east (>), or west (<). After each move, he delivers another present to
+; the house at his new location.
+; 
+; However, the elf back at the north pole has had a little too much eggnog, and so his directions are
+; a little off, and Santa ends up visiting some houses more than once. How many houses receive at least
+; one present?
+; 
+; For example:
+; 
+; > delivers presents to 2 houses: one at the starting location, and one to the east.
+; ^>v< delivers presents to 4 houses in a square, including twice to the house at his starting/ending location.
+; ^v^v^v^v^v delivers a bunch of presents to some very lucky children at only 2 houses.
+; 
+; 
+
+
+(require racket/file rackunit racket/match)
+
+;; Problem input from adventofcode.com
+(define day3  (file->string "input3.txt"))
+
+(define (day3.1 day3)
+  (length (remove-duplicates (cons '(0 0) ; make sure starting point is included in locations
+                                   (locs-visited '(0 0) (string->list day3))))))
+
+;; point (list-of char) -> (list-of point)
+;; create a list of all positions visited, starting at point "pos" and moving as directed by the list "moves"
+(define (locs-visited pos moves)
+  (cond ((empty? moves) empty) 
+        (else
+         (let ([new-pos (make-move (first moves) pos)])
+           (cons new-pos (locs-visited new-pos (rest moves)))))))
+
+;; char point -> point
+;; given a movement direction and current location return next location
+(define (make-move dir loc)
+  (let ([x (first loc)]
+        [y (second loc)])
+    (case dir
+      [(#\<) (list (- x 1) y)]    ; left
+      [(#\>) (list (+ x 1) y)]    ; right
+      [(#\^) (list x (- y 1))]    ; up
+      [(#\v) (list x (+ y 1))]))) ; down
+
+(module+ test
+  (check-equal? (make-move '#\> (list 0 0)) (list 1 0))
+  (check-equal? (make-move '#\< (list 0 0)) (list -1 0))
+  (check-equal? (make-move '#\v (list 0 0)) (list 0 1))
+  (check-equal? (make-move '#\^ (list 0 0)) (list 0 -1)))
+
+(time (printf "2015 AOC Problem 3.1 = ~a\n" (day3.1 day3)))
+
+; --- Part Two ---
+; 
+; The next year, to speed up the process, Santa creates a robot version of himself, Robo-Santa,
+; to deliver presents with him.
+; 
+; Santa and Robo-Santa start at the same location (delivering two presents to the same starting house),
+; then take turns moving based on instructions from the elf, who is eggnoggedly reading from the same
+; script as the previous year.
+; 
+; This year, how many houses receive at least one present?
+; 
+; For example:
+; 
+; ^v delivers presents to 3 houses, because Santa goes north, and then Robo-Santa goes south.
+; 
+; ^>v< now delivers presents to 3 houses, and Santa and Robo-Santa end up back where they started.
+; 
+; ^v^v^v^v^v now delivers presents to 11 houses, with Santa going one direction and Robo-Santa going
+; the other.
+; 
+
+
+(define (day3.2 day3)
+   (length (remove-duplicates (cons '(0 0) ; make sure starting point is included in locations
+                                  (append
+                                   (alternating-locs-visited '(0 0) (string->list day3))     ; Santa 
+                                   (alternating-locs-visited '(0 0) (rest (string->list day3)))))))) ; Robo Santa
+
+;; point (list-of char) -> (list-of point)
+;; create a list of all positions visited, starting at point "pos" and moving as directed by the list "moves"
+;; Santa moves on odd moves, Robo-Santa moves on even moves
+(define (alternating-locs-visited pos moves)
+  (cond ((empty? moves) empty)
+        ((empty? (rest moves)) empty)
+        (else
+         (let ([new-pos (make-move (first moves) pos)])
+           (cons new-pos (alternating-locs-visited new-pos (rest (rest moves))))))))
+
+(time (printf "2015 AOC Problem 3.2 = ~a\n" (day3.2 day3)))
