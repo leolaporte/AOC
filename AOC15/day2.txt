@@ -101,3 +101,8 @@
   (check-equal? (dim->ribbon (list 1 1 10)) 14))
 
 (time (printf "2015 AOC Problem 2.2 = ~a\n" (day2.2 day2)))
+
+;2015 AOC Problem 2.1 = 1586300
+;cpu time: 4 real time: 4 gc time: 0
+;2015 AOC Problem 2.2 = 3737498
+;cpu time: 3 real time: 3 gc time: 0
