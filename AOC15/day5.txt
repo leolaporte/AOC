@@ -1,0 +1,140 @@
+#lang racket
+;  AOC 2015
+; Day 5
+; Leo Laporte
+; 
+; --- Day 5: Doesn't He Have Intern-Elves For This? ---
+; 
+; Santa needs help figuring out which strings in his text file are naughty or nice.
+; 
+; A nice string is one with all of the following properties:
+; 
+; It contains at least three vowels (aeiou only), like aei, xazegov, or aeiouaeiouaeiou.
+; 
+; It contains at least one letter that appears twice in a row, like xx, abcdde (dd), or
+; aabbccdd (aa, bb, cc, or dd).
+; 
+; It does not contain the strings ab, cd, pq, or xy, even if they are part of one of
+; the other requirements.
+; 
+; For example:
+; 
+; ugknbfddgicrmopn is nice because it has at least three vowels (u...i...o...), a double
+; letter (...dd...), and none of the disallowed substrings.
+; 
+; aaa is nice because it has at least three vowels and a double letter, even though
+; the letters used by different rules overlap.
+; 
+; jchzalrnumimnmhp is naughty because it has no double letter.
+; 
+; haegwjzuvuyypxyu is naughty because it contains the string xy.
+; 
+; dvszwmarrgswjxmb is naughty because it contains only one vowel.
+; 
+; How many strings are nice?
+
+
+(require racket/file rackunit)
+
+;; Notes: this can be simply solved with regular expressions. Probably easiest to do this on
+;; the command line with egrep. E.g.
+
+; egrep -v 'ab|cd|pq|xy' input5.txt | egrep '(.*[aeiou]){3}' | egrep '(.)\1' | wc
+
+;; but it's good Racket practice. Racket regexp is pretty close to egrep but there are
+;; some differences...
+
+;; Problem input from adventofcode.com
+(define day5data (string-split (file->string "input5.txt")))
+
+;; (list-of string) -> natural
+;; counts the number if nice strings in the given list of strings
+(define (day5.1 lst)
+  (length (filter nice? lst)))
+
+;; Regular expressions - pre-compile for speed
+(define vowels (pregexp "(.*[aeiou]){3,}")) ; vowels repeated three times with zero or more chars in-between
+(define doubled (pregexp "(.)\\1"))         ; anything repeated (the \ has to be escaped in Racket)
+(define naughty (pregexp "ab|cd|pq|xy"))    ; a simple or
+
+;; string -> boolean
+;; returns #true if the string satisfies all three criteria for niceness
+(define (nice? str)
+  (and (regexp-match? vowels str)           ; at least three vowels
+       (regexp-match? doubled str)          ; at least one pair of doubled letters
+       (not (regexp-match? naughty str))))  ; no naughty strings
+
+(module+ test 
+  (check-equal? (nice? "ugknbfddgicrmopn") #true)
+  (check-equal? (nice? "aaa") #true)
+  (check-equal? (nice? "jchzalrnumimnmhp") #false)
+  (check-equal? (nice? "haegwjzuvuyypxyu") #false)
+  (check-equal? (nice? "dvszwmarrgswjxmb") #false))
+
+(time (printf "2015 AOC Problem 5.1 = ~a\n" (day5.1 day5data)))
+
+;  --- Part Two ---
+; 
+; Realizing the error of his ways, Santa has switched to a better model of determining
+; whether a string is naughty or nice. None of the old rules apply, as they are all
+; clearly ridiculous.
+; 
+; Now, a nice string is one with all of the following properties:
+; 
+; It contains a pair of any two letters that appears at least twice in the string without
+; overlapping, like xyxy (xy) or aabcdefgaa (aa), but not like aaa (aa, but it overlaps).
+; 
+; It contains at least one letter which repeats with exactly one letter between them, like
+; xyx, abcdefeghi (efe), or even aaa.
+; 
+; For example:
+; 
+; qjhvhtzxzqqjkmpb is nice because is has a pair that appears twice (qj) and a letter that
+; repeats with exactly one letter between them (zxz).
+; 
+; xxyxx is nice because it has a pair that appears twice and a letter that repeats with one
+; between, even though the letters used by each rule overlap.
+; 
+; uurcxstgmygtbstg is naughty because it has a pair (tg) but no repeat with a single letter
+; between them.
+; 
+; ieodomkazucvgmuy is naughty because it has a repeating letter with one between (odo), but
+; no pair that appears twice.
+; 
+; How many strings are nice under these new rules?
+
+
+(define (day5.2 lst)
+  (length (filter new-nice? lst))) 
+
+;; pre-compile regex
+(define doubled-no-overlap (pregexp "(..).*\\1")) ; repeating char pair without overlap
+(define repeating-char (pregexp "(.).\\1"))  ; character repeats with exactly one in-between
+
+(define (new-nice? str)
+  (and (regexp-match? doubled-no-overlap str)
+       (regexp-match? repeating-char str)))
+  
+(module+ test
+  (check-equal? (regexp-match? doubled-no-overlap"xyxy") #t)
+  (check-equal? (regexp-match? doubled-no-overlap"aabcdefgaa") #t)
+  (check-equal? (regexp-match? doubled-no-overlap "aaa") #f)
+
+  (check-equal? (regexp-match? repeating-char "xyx") #t)
+  (check-equal? (regexp-match? repeating-char ", abcdefeghi") #t)
+  (check-equal? (regexp-match? repeating-char "aaa") #t)
+
+  (check-equal? (new-nice? "qjhvhtzxzqqjkmpb") #t)
+  (check-equal? (new-nice? "xxyxx") #t)
+  (check-equal? (new-nice? "uurcxstgmygtbstg") #f)
+  (check-equal? (new-nice? "ieodomkazucvgmuy") #f))
+
+(time (printf "2015 AOC Problem 5.2 = ~a\n" (day5.2 day5data)))
+
+; Timings with Racket 8.3 (CS) on 14" MacBook Pro with M1 Pro/16GB RAM
+; in milliseconds
+
+; 2015 AOC Problem 5.1 = 238
+; cpu time: 17 real time: 17 gc time: 4
+; 2015 AOC Problem 5.2 = 69
+; cpu time: 12 real time: 12 gc time: 0
