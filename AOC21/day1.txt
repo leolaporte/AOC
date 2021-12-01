@@ -67,16 +67,7 @@
 
 (require racket/file rackunit)
 
-(define sample-data (list 199
-                          200
-                          208
-                          210
-                          200
-                          207
-                          240
-                          269
-                          260
-                          263))
+(define sample-data (list 199 200 208 210 200 207 240 269 260 263))
 
 ;; Problem input from adventofcode.com
 (define day1data (map string->number (string-split (file->string "input1.txt"))))
@@ -147,13 +138,23 @@
 
 (define (day1.2 readings)
   (local [(define (rolling-average-increases count prev lst)
-            (cond [(empty? (cddr lst)) count] ; too few reading left, done
+            (cond [(empty? (cddr lst)) count] ; too few readings left, done
                   [else (let* ([sum (+ (first lst) (second lst) (third lst))]
                               [count (if (> sum prev) (add1 count) count)])
                           (rolling-average-increases count sum (rest lst)))]))] ; tail recursive this time!
-    (sub1 (rolling-average-increases 0 0 readings)))) ; discount first reading - it's always bigger
+    (sub1 (rolling-average-increases 0 0 readings)))) ; discount first reading - it's always > 0
 
 (module+ test
   (check-equal? (day1.2 sample-data2) 5))
 
  (time (printf "2021 AOC Problem 1.2 = ~a\n" (day1.2 day1data)))
+
+; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+; 2021 AOC Problem 1.1 = 1342
+; cpu time: 1 real time: 1 gc time: 0
+; 2021 AOC Problem 1.2 = 1378
+ ;cpu time: 1 real time: 1 gc time: 0
+
+; Real world timing
+; Day       Time  Rank  Score       Time   Rank  Score
+;  1   00:24:22  7349      0   12:27:40  59726      0
