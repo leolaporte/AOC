@@ -50,7 +50,7 @@
 ;; (list-of string) -> natural
 ;; counts the number if nice strings in the given list of strings
 (define (day5.1 lst)
-  (length (filter nice? lst)))
+  (count nice? lst))
 
 ;; Regular expressions - pre-compile for speed
 (define vowels (pregexp "(.*[aeiou]){3,}")) ; vowels repeated three times with zero or more chars in-between
@@ -105,7 +105,7 @@
 
 
 (define (day5.2 lst)
-  (length (filter new-nice? lst))) 
+  (count new-nice? lst))
 
 ;; pre-compile regex
 (define doubled-no-overlap (pregexp "(..).*\\1")) ; repeating char pair without overlap
