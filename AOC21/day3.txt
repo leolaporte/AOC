@@ -142,8 +142,8 @@
   (check-equal? (bin-list->decimal '(1 0 1 0)) 10)
   (check-equal? (bin-list->decimal '(1 1 1 1)) (+ 1 2 4 8))
   (check-equal? (bin-list->decimal '(1 0 0 0)) 8))
-           
-; (time (printf "2021 AOC Problem 3.1 = ~a\n" (day3.1 day3data)))
+
+(time (printf "2021 AOC Problem 3.1 = ~a\n" (day3.1 day3data)))
 
 ;  --- Part Two ---
 ; 
@@ -212,27 +212,25 @@
 (define O2 1)
 (define CO2 0)
 
-(define (day3.2 lst) 0)
+(define (day3.2 data)
+  (* (solve-for-type data 0 O2) (solve-for-type data 0 CO2)))
 
 ;; (list-of string) type -> natural
-;; given a list of binary numbers represented as strings and the type of rating we're solving for
-;; return the decimal solution
-(define (solve-for-type data type)
-  (for* ([col (in-naturals)]                    ; start with column 0 and increment each pass
-         [data (reduce-list data col type)]     ; reduce the list on each pass
-         #:unless (equal? (length data) 1))     ; reduced to final answer?
-    (string->number (car data) 2)))             ; output final answer as decimal
-
+;; given a list of binary numbers represented as strings and the type of rating we're solving ;; for return the decimal solution
+(define (solve-for-type data col type)
+  (cond [(equal? (length data) 1) (string->number (car data) 2)]
+        [else (solve-for-type (reduce-list data col type) (add1 col) type)]))
+                                 
 (module+ test
-  (check-equal? (solve-for-type sample-data O2) 23)
-  (check-equal? (solve-for-type sample-data CO2) 10))
+  (check-equal? (solve-for-type sample-data 0 O2) 23)
+  (check-equal? (solve-for-type sample-data 0 CO2) 10))
 
 ;; (list-of string) natural natural -> (list-of string)
 ;; given a list of binary numbers represented as strings, the column to total, and the type of
 ;; solution (O2 or CO2) return the list of strings that match the type
 (define (reduce-list data col type)
   (let* ([len (length data)]
-         [col-total (total-column col data)]
+         [col-total (total-column data col)]
          [key (if (equal? type O2)
                   (get-mcv col-total len)
                   (get-lcv col-total len))])
@@ -242,24 +240,28 @@
   (check-equal? (reduce-list sample-data 0 O2)
                 (list "11110" "10110" "10111" "10101" "11100" "10000" "11001"))
   (check-equal? (reduce-list sample-data 0 CO2)
-                (list "00100" "01111" "00111" "00010" "01010")))
+                (list "00100" "01111" "00111" "00010" "01010"))
+  (check-equal? (reduce-list '("11110" "10110" "10111" "10101" "11100" "10000" "11001") 1 O2)
+                (list "10110" "10111" "10101" "10000")))
 
 (define (get-mcv col-total len)
-  (if (>= col-total (quotient len 2)) #\1 #\0))
+  (if (>= col-total (/ len 2)) #\1 #\0))
 
 (define (get-lcv col-total len)
-  (if (>= col-total (quotient len 2)) #\0 #\1))
+  (if (>= col-total (/ len 2)) #\0 #\1))
 
 ;; natural (list-of string) -> natural
 ;; given a list of binary numbers represented as strings return the sum of digits in the given bit position
-(define (total-column col lst)
+(define (total-column data col)
   (local [(define (process-list vl)
             (cond [(empty? vl) 0]
                   [else (+ (binary-string-ref (first vl) col) (process-list (rest vl)))]))]
-    (process-list lst)))
+    (process-list data)))
 
 (module+ test
-  (check-equal? (total-column 0 '("100" "101" "010" "111")) 3))
+  (check-equal? (total-column '("100" "101" "010" "111") 0) 3)
+  (check-equal? (total-column '("100" "101" "010") 1) 1)
+  (check-equal? (total-column '("100" "101" "010" "111") 2) 2))
 
 ;; string natural -> 1 or 0
 ;; given a string representing a binary number return the value (1 or 0) in the given position
@@ -273,11 +275,20 @@
   (check-equal? (binary-string-ref "001000" 2) 1)
   (check-equal? (binary-string-ref "000100" 3) 1))
 
-;(module+ test
-;  (check-equal? (day3.2 sample-data) 230))
+(module+ test
+  (check-equal? (day3.2 sample-data) 230))
 
-; (time (printf "2021 AOC Problem 3.2 = ~a\n" (day3.2 day3data)))
+ (time (printf "2021 AOC Problem 3.2 = ~a\n" (day3.2 day3data)))
 
 ; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+; 2021 AOC Problem 3.1 = 3885894
+; cpu time: 3 real time: 3 gc time: 0
+; 2021 AOC Problem 3.2 = 4375225
+; cpu time: 2 real time: 2 gc time: 0
 
 ; Real world timing
+;      --------Part 1---------   --------Part 2--------
+;Day       Time    Rank  Score       Time   Rank  Score
+;  3       >24h  102352      0       >24h  88448      0
+;  2   00:38:41   13051      0   01:06:26  14647      0
+;  1   00:24:22    7349      0   12:27:40  59726      0
