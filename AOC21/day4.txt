@@ -88,7 +88,8 @@
 ; until this point, the second board would have a sum of unmarked numbers equal to 148 for
 ; a final score of 148 * 13 = 1924.
 ; 
-; Figure out which board will win last. Once it wins, what would its final score be?
+; Figure out which board will win last. Once it wins,
+;  what would its final score be?
 ; 
 
 
@@ -143,6 +144,7 @@
         '#(14 21 17 24 4 10 16 15 9 19 18 8 23 26 20 22 11 13 6 5 2 0 12 3 7)))
 
 ;; use these to check for BINGO!
+
 (define rows ; vector-ref for row positions in a 5x5 board, zero based
   (list '( 0  1  2  3  4)
         '( 5  6  7  8  9)
@@ -185,7 +187,7 @@
 ;; given a list of bingo board (stored as vectors) and bingo balls produce
 ;; a list containing unsolved boards (remaining after solver runs) and 
 ;; a list of winning boards (stored as the product of the remaining squares and the ball
-;; that produced the bingo) in reverse chronological order (first solved is last)
+;; that produced the bingo)
 (define (solve-all boards balls)
   (for/fold ([bds boards]                 ; accumulator: list of remaining boards
              [winners empty]              ; accumulator: list of winning solutions
@@ -193,7 +195,7 @@
             ([b (in-list balls)])         ; iterate through all the provided bingo balls
     #:break (empty? bds)                  ; ran out of boards before we ran out of balls
     (let ([sol (solve-boards bds b)])     ; get list of solutions for current ball 
-      (values (filter vector? sol)                      ; store remaining boards in accumulator
+      (values (filter vector? sol)                      ; remaining boards to accumulator
               (append (filter number? sol) winners))))) ; append solved boards to accumulator
 
 (define (day4.1 boards balls )
@@ -237,7 +239,7 @@
   (vector-map (λ (square) (if (equal? square ball) MARK square)) board))
 
 ;; (vector-of Natural) -> boolean
-;; given a bingo board (a vector of numbers) #true if we have a bingo
+;; given a bingo board (a vector of numbers) return #true if we have a bingo
 (define (bingo? board)
   (or (for/or ([r (in-list rows)]) (check-line r board))    ; check rows
       (for/or ([c (in-list cols)]) (check-line c board))))  ; check cols
