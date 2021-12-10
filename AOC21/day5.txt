@@ -85,7 +85,10 @@
 ;; them.
 ;;
 ;; Just in case we need to pay attention to diagonals in part two, I need to write the
-;; point generator to handle both these cases. For now, I can eliminate the diagonals
+;; point generator to handle both these cases. For now, I can eliminate the diagonals.
+;;
+;; Update: re-wrote the point generator, but it's ugly. I'm sure there's a better way
+;; to do it with Racket iterators. I'll investigate some day. 
 
 (define (count-multipoint-entries hsh)
   (length (filter (λ (x) (> x 1)) (hash-values hsh))))
@@ -97,29 +100,34 @@
          (make-point-hash hsh (rest all-points))]))
 
 (define (make-point-list end-points)
-  (let ([x1 (first end-points)]
+  (let* ([x1 (first end-points)]
         [y1 (second end-points)]
         [x2 (third end-points)]
-        [y2 (fourth end-points)])
-    (for*/list ([x (points-to-from x1 x2)]
-                [y (points-to-from y1 y2)])
-      (cons x y))))
-
+        [y2 (fourth end-points)]
+        [step-x (if (> x1 x2) -1 1)]  ; handle right->left 
+        [step-y (if (> y1 y2) -1 1)]) ; and bottom->top lines
+    
+    (if (straight-line? end-points)
+        (for*/list ([x (in-inclusive-range x1 x2 step-x)]
+                    [y (in-inclusive-range y1 y2 step-y)])
+          (cons x y))
+        (for/list ([x (in-inclusive-range x1 x2 step-x)]
+                   [y (in-inclusive-range y1 y2 step-y)])
+          (cons x y)))))
+      
 (module+ test
   (check-equal? (make-point-list '(0 9 5 9))  ; horizontal
                 (list '(0 . 9) '(1 . 9) '(2 . 9) '(3 . 9) '(4 . 9) '(5 . 9)))
   (check-equal? (make-point-list '(7 0 7 4))  ; vertical 
                 (list '(7 . 0) '(7 . 1) '(7 . 2) '(7 . 3) '(7 . 4)))
   (check-equal? (make-point-list '(9 7 7 7))  ; right -> left
-                (list '(7 . 7) '(8 . 7) '(9 . 7)))
-    (check-equal? (make-point-list '(0 5 0 0))  ; bottom -> top
-                '((0 . 0) (0 . 1) (0 . 2) (0 . 3) (0 . 4) (0 . 5))))
-
-(define (points-to-from x y)
-  "provides points in a line no matter in which direction it goes"
-  (if (< x y)
-      (stream->list (in-inclusive-range x y))
-      (stream->list (in-inclusive-range y x))))
+                '((9 . 7) (8 . 7) (7 . 7)))
+  (check-equal? (make-point-list '(0 5 0 0))  ; bottom -> top
+                 '((0 . 5) (0 . 4) (0 . 3) (0 . 2) (0 . 1) (0 . 0)))
+  (check-equal? (make-point-list '(4 4 8 8))  ; diagonal left->right
+                '((4 . 4) (5 . 5) (6 . 6) (7 . 7) (8 . 8)))
+  (check-equal? (make-point-list '(8 0 0 8))  ; diagonal right->left
+                 '((8 . 0) (7 . 1) (6 . 2) (5 . 3) (4 . 4) (3 . 5) (2 . 6) (1 . 7) (0 . 8))))
 
 (define (increment-points hsh point-list)
   (cond [(equal? empty point-list) hsh]
@@ -156,18 +164,61 @@
 
 (time (printf "2021 AOC Problem 5.1 = ~a\n" (day5.1 input-points)))
 
-;  
+;  --- Part Two ---
+; 
+; Unfortunately, considering only horizontal and vertical lines doesn't give you the full
+; picture; you need to also consider diagonal lines.
+; 
+; Because of the limits of the hydrothermal vent mapping system, the lines in your list
+; will only ever be horizontal, vertical, or a diagonal line at exactly 45 degrees. In other words:
+; 
+; An entry like 1,1 -> 3,3 covers points 1,1, 2,2, and 3,3.
+; An entry like 9,7 -> 7,9 covers points 9,7, 8,8, and 7,9.
+; Considering all lines from the above example would now produce the following diagram:
+; 
+; 1.1....11.
+; .111...2..
+; ..2.1.111.
+; ...1.2.2..
+; .112313211
+; ...1.2....
+; ..1...1...
+; .1.....1..
+; 1.......1.
+; 222111....
+; 
+; You still need to determine the number of points where at least two lines overlap.
+; In the above example, this is still anywhere in the diagram with a 2 or larger - now a
+; total of 12 points.
+; 
+; Consider all of the lines. At how many points do at least two lines overlap?
 ; 
 
 
-;(define (day5.2 data) 0) ; stub
-;
-;(module+ test
-;  (check-equal? (day5.2 sample-points) 0))
-;
-;(time (printf "2021 AOC Problem 5.2 = ~a\n" (day5.2 input-points)))
+;; NOTES: I KNEW it!! Rewriting make-point-list to include 45 degree diagonal lines.
+
+(define (day5.2 input)
+   (~> input
+     ; (filter straight-line? _) ; we need to count diagonals this time
+      (make-point-hash (make-hash) _)
+      (count-multipoint-entries _)))
+
+(module+ test
+  (check-equal? (day5.2 sample-points) 12))
+
+(time (printf "2021 AOC Problem 5.2 = ~a\n" (day5.2 input-points)))
 
 ; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+;2021 AOC Problem 5.1 = 7468
+;cpu time: 450 real time: 464 gc time: 21
+;2021 AOC Problem 5.2 = 22364
+;cpu time: 1639 real time: 1677 gc time: 88
 
 ; Real world timing
-
+;      --------Part 1---------   --------Part 2--------
+;Day       Time    Rank  Score       Time   Rank  Score
+;  5       >24h   71260      0       >24h  68517      0
+;  4       >24h   77972      0       >24h  75701      0
+;  3       >24h  102352      0       >24h  88448      0
+;  2   00:38:41   13051      0   01:06:26  14647      0
+;  1   00:24:22    7349      0   12:27:40  59726      0
