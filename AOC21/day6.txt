@@ -73,48 +73,88 @@
 
 (require racket/file threading rackunit)
 
+;; (list-of Natural) -> Vector
+;; given a list of single digit numbers return a vector with the counts for each
+(define (rle list)
+  (for/vector ([i (in-range 0 10)])
+    (count (λ (x) (equal? i x)) list)))
+
 ;; Problem input from adventofcode.com
-(define day6data (file->string "input6.txt"))
-(define input (~> day6data                  ; convert into a list of 300 numbers
+(define input (~> (file->string "input6.txt")  ; read in raw data
                   (string-split _ "\n")     ; cut pesky little \n at end
                   (first _)                 ; turn it back into string
                   (string-split _ ",")      ; chop it up into 300 strings
-                  (map string->number _)))  ; finally turn each string into a number
+                  (map string->number _)    ; turn each string into a number
+                  (rle _)))                 ; run-length encoding turns it into a vector 
                    
 ;; Provided test data
-(define sample-data '(3 4 3 1 2)) 
+(define sample-data (rle '(3 4 3 1 2))) 
 
-(define (day6.1 fish days)
-  (for/fold ([f fish]
-            #:result (length f))
-            ([d (in-range 0 days)])
-    (values (process f))))
+;; Vector Natural -> Natural
+;; Given a vector representing the current fish population and the number of days
+;; to breed, return the new number of fish
+(define (breed-lanternfish fish days)
+  (for ([d (in-range 0 days)])
+    (set! fish (next-generation fish)))
+  (apply + (rest (reverse (vector->list fish))))) ; drop the 9 position before adding
+  
+;; Vector -> Vector
+;; given a vector of fish counts 
+(define (next-generation fish)
+  (let ([f (vector-rotate-left fish)])  ; subtract a day - vector-ref 9 is unused
+    (vector-set! f 6 (+ (vector-ref f 9) (vector-ref f 6))) ; fish starting over
+    (vector-set! f 8 (vector-ref f 9)) ; add newborns
+    f))
 
-;; (list-of Natural) -> (list-of Natural)
-;; given a list of fish, for all fish, if fish = 0 replace it with 6 and 8, else subtract 1 
-(define (process fish)
-  (cond [(empty? fish) empty]
-        [else (if (zero? (first fish))
-                  (append '(6 8) (process (rest fish)))
-                  (cons (sub1 (first fish)) (process (rest fish))))]))
+;; Vector -> Vector
+;; rotates a vector left, moving 0 position to 9
+(define (vector-rotate-left v)
+  (local [(define (rotate-left l)
+            (append (rest l) (cons (first l) empty)))]
+    (list->vector (rotate-left (vector->list v)))))
 
 (module+ test
-  (check-equal? (day6.1 sample-data 18) 26)
-  (check-equal? (day6.1 sample-data 80) 5934))
+  (check-equal? (vector-rotate-left (list->vector '(0 1 2 3 4 5 6 7 8 9)))
+                (list->vector '(1 2 3 4 5 6 7 8 9 0))))
 
-(time (printf "2021 AOC Problem 6.1 = ~a\n" (day6.1 input 80)))
+(module+ test
+  (check-equal? (breed-lanternfish sample-data 18) 26)
+  (check-equal? (breed-lanternfish sample-data 80) 5934))
 
-;  
+(time (printf "2021 AOC Problem 6.1 = ~a\n" (breed-lanternfish input 80)))
+
+;  --- Part Two ---
 ; 
+; Suppose the lanternfish live forever and have unlimited food and space.
+; Would they take over the entire ocean?
+; 
+; After 256 days in the example above, there would be a total of 26984457539
+; lanternfish!
+; 
+; How many lanternfish would there be after 256 days? 
 
 
-;(define (day6.2 data) 0) ; stub
-;
-;(module+ test
-;  (check-equal? (day6.2 sample-data) 0))
-;
-;(time (printf "2021 AOC Problem 6.2 = ~a\n" (day6.2 day6data)))
+;; Is there a mistake in the assignment? The example data is the same as the problem data!
+;; well in any event the number of fish grows so large I can't store them in memory
+;; so clearly I'm going to have to compress the results. Ah! That's what run-length
+;; encoding is for. And by replacing that massive and exponentially larger (list-of fish)
+;; with a vector of length 9 representing the number of fish at each day of maturity
+;; (0-8) I can massively reduce the compute time and memory requirements. 
+
+(time (printf "2021 AOC Problem 6.2 = ~a\n" (breed-lanternfish input 256)))
 
 ; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+;2021 AOC Problem 6.1 = 350917
+;cpu time: 1 real time: 1 gc time: 0 (wow! a LOT faster using the RLE encoded population)
+;2021 AOC Problem 6.2 = 1592918715629
+;cpu time: 0 real time: 0 gc time: 0
 
 ; Real world timing
+;      --------Part 1---------   --------Part 2--------
+;Day       Time    Rank  Score       Time   Rank  Score
+;  6       >24h   71604      0       >24h  67093      0
+;  5       >24h   71260      0       >24h  68517      0
+;  4       >24h   77972      0       >24h  75701      0
+;  3       >24h  102352      0       >24h  88448      0
+;  2   00:38:41   13051      0   01:06:26  14647      0
+;  1   00:24:22    7349      0   12:27:40  59726      0
