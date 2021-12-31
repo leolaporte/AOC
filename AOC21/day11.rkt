@@ -16,6 +16,13 @@
 (require threading
          rackunit)
 
+;; NOTES: Good spec challenge here: 90% of the work was interpreting the problem
+;; description. There was enough ambiguity in the prose description that
+;; I had to test my hypotheses against the sample data. So to start, let's
+;; get that data massaged into a vector. Each point on the vector is
+;; the state of an octopus. (I've been using 1D vectors to represent
+;; 2D grids for efficiency.)
+
 ;; Given dimension constants
 (define HEIGHT 10)
 (define WIDTH 10)
@@ -41,15 +48,26 @@
 ;; diagonals.
 
 ;; Natural -> (list-of Natural)
-;; given a point on a grid structure, return a list of the 
-;; eight surrounding points including diagonals
+;; given a point on a grid vector, return a list of the 
+;; eight surrounding vector refs including diagonals
 (define (surrounding p)
+  ; I prefer to store 2D grids as a vector of points
+  ; so we'll need some utilities to convert back and forth
+  ; from point to x,y position:
   (define (pos->point x y)
+    "convert x y coords to vector point"
     (+ x (* y WIDTH)))
+  
   (define (point->pos p)
+    "convert vector point to x.y coords"
     (let-values ([(y x) (quotient/remainder p WIDTH)])
       (cons x y)))
-  
+
+  (define (in-grid? xy)
+    "using x.y coords are we still inside the grid?"
+    (and (< -1 (car xy) WIDTH) (< -1 (cdr xy) HEIGHT)))
+
+  ; calculate all the surrounding points 
   (let* ([pos (point->pos p)]
          [x (car pos)]                    ; convert vector-ref...
          [y (cdr pos)]                    ; to x,y coordinates (simplifies in-grid test)
@@ -61,7 +79,6 @@
          [ne (cons (add1 x) (sub1 y))]    ; northeast
          [sw (cons (sub1 x) (add1 y))]    ; southwest
          [se (cons (add1 x) (add1 y))])   ; southeast
-    (define (in-grid? xy) (and (< -1 (car xy) WIDTH) (< -1 (cdr xy) HEIGHT)))
 
     (~>  (list nw n ne w e sw s se)   ; the list of points as (x . y)
          (filter in-grid? _)          ; remove points that are off the grid
@@ -78,11 +95,11 @@
 ;; and some testing I've come up with this:
 ;;
 ;; Repeat 100 times:
-;; 1.Add1 to all points 
-;; 2.Start at Vec[0].
-;;   IF point value is >9 set to 0 and ADD1 to all SURROUNDS > 0. Go to 2.
-;;   ELSE go to next point in vector and scan again
-;;   When you reach end of vector you're done.
+;; 1. Add1 to all points 
+;; 2. Start at Vec[0].
+;;    IF point value is >9 set to 0 and ADD1 to all SURROUNDS > 0. Go to 2.
+;;    ELSE go to next point in vector and scan again
+;;    When you reach end of vector you're done.
 ;; 3. Count 0s in Vector, add count to flash-count. Go to 1
 ;; 
 
@@ -93,9 +110,9 @@
         
         [(> (vector-ref v p) 9)     ; flasher!
          (vector-set! v p 0)        ; set it to 0 and ... 
-         (for ([pt (in-list (surrounding p))]) ; ... increment surrounding points and ...
+         (for ([pt (in-list (surrounding p))]) ; ... increment surrounding points but ...
            (let ([val (vector-ref v pt)]) 
-             (cond [(> val 0)  (vector-set! v pt (add1 val))]))) ; only if it hasn't yet flashed
+             (cond [(> val 0)  (vector-set! v pt (add1 val))]))) ; .. only if it hasn't yet flashed, then ...
          (scan 0 v)] ; ... restart scan
         
         [else (scan (add1 p) v)]))  ; not flasher so go to next point
@@ -104,7 +121,7 @@
   (check-equal? (scan 0 (vector-map add1 test-data))
                 (octopus "6594254334\n3856965822\n6375667284\n7252447257\n7468496589\n5278635756\n3287952832\n7993992245\n5957959665\n6394862637")))
  
-; do 10 steps (with data and result from problem description)
+; do 10 steps (with data and result from problem description) - I really want to test this method!
 (check-equal? (~> (octopus "5483143223\n2745854711\n5264556173\n6141336146\n6357385478\n4167524645\n2176841721\n6882881134\n4846848554\n5283751526\n")
                   (vector-map add1 _)
                   (scan 0 _)           ; step 1
