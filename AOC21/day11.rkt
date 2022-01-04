@@ -14,7 +14,8 @@
 
 
 (require threading
-         rackunit)
+         rackunit
+         plot)
 
 ;; NOTES: Good spec challenge here: 90% of the work was interpreting the problem
 ;; description. There was enough ambiguity in the prose description that
