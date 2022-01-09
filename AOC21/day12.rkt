@@ -1,6 +1,6 @@
 #lang racket
 ;  AOC 2021
-; Leo Laporte
+; Leo Laporte 8-Jan-2022
 ; 
 ; --- Day 12: Passage Pathing ---
 ; 
@@ -9,8 +9,6 @@
 ; only way to know if you've found the best path is to find all of them.
 ; 
 ; How many paths through this cave system are there that visit small caves at most once?
-; 
-
 
 (require threading
          rackunit
@@ -25,12 +23,14 @@
 ;; numbers that were too low - I wasn't capturing legal paths like start-A-b-A-c-A-end
 
 ;; Gotcha 2: it's looping endlessly. I need to look at how it should terminate. Probably
-;; need to track seen paths. Yep. Never clear visited list.
+;; need to track seen paths. Yep. Never clear visited list. Each path search takes
+;; its own list with it, of course. Lesson learned.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                DATA                              ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; Precompile regex strings for speed
 (define graph-regex (pregexp "start|end|[a-z]{1,2}|[A-Z]{1,2}")) ; regex for conversion to graph
 (define lower-case (regexp "[a-z]+"))  ; lower-case regex  
 
@@ -85,23 +85,23 @@
 ;; case vertex more than once
 (define (count-paths start end graph)
 
-  (define (small-cave? v)
-    "is the provided vertex lower-case? (i.e. a small cave, start, or end)"
-    (regexp-match? lower-case v))
+  (local [(define (small-cave? v)
+            "is the provided vertex lower-case? (i.e. a small cave, start, or end)"
+            (regexp-match? lower-case v))]
 
-  (define (next-path v visited)
-    (cond [(member v visited) 0]       ; been there, done that, not a path
-          [(equal? v end) 1]           ; success, add 1 to path count
-          [else (cond [(small-cave? v) (set! visited (cons v visited))]) ; don't revisit small caves
-                (next-paths (hash-ref graph v) visited)])) ; continue search
+    (define (next-path v visited)
+      (cond [(member v visited) 0]       ; been there, done that, not a path
+            [(equal? v end) 1]           ; success, add 1 to path count
+            [else (cond [(small-cave? v) (set! visited (cons v visited))]) ; don't revisit small caves
+                  (next-paths (hash-ref graph v) visited)])) ; continue search
 
-  (define (next-paths lov visited)
-    (cond [(empty? lov) 0]
-          [else (+ (next-path (first lov) visited)
-                   (next-paths (rest lov) visited))]))
+    (define (next-paths lov visited)
+      (cond [(empty? lov) 0]
+            [else (+ (next-path (first lov) visited)
+                     (next-paths (rest lov) visited))]))
 
-  ; (trace next-paths) 
-  (next-path start empty))
+    ; (trace next-paths) 
+    (next-path start empty)))
 
 (define (day12.1 graph)
   (count-paths "start" "end" graph)) 
@@ -130,7 +130,6 @@
 ; Given these new rules, how many paths through this cave system are there? 
 ; 
 
-
 ;; Notes: I can reuse my path search. But the logic for terminating a path
 ;; has changed: I can visit any one small cave twice, but the subsequent small
 ;; caves can only be visited once. And start and end can only be visited once.
@@ -138,43 +137,47 @@
 ;; the previous rules apply. I'll use hurry? as my boolean: it starts false
 ;; but becomes true once we've visited a little cave twice.
 
-(define little-cave-regex (pregexp "^[a-z]{1,2}$"))  ; lower-case with one or two letters
+;; This turned out kind of slow - possible optimizations: use set for
+;; visited instead of list? I suspect doubled-member? is slow and it's run
+;; on every iteration of next-path.
 
 (define (leisurely-list-paths start end graph)
 
-  (define (not-big-cave? v)
-    "is the provided vertex lower-case? (i.e. a small cave start or end)"
-    (regexp-match? lower-case v))
+  (local [(define little-cave-regex (pregexp "^[a-z]{1,2}$"))  ; lower-case with one or two letters
+
+          (define (not-big-cave? v)
+            "is the provided vertex lower-case? (i.e. a small cave start or end)"
+            (regexp-match? lower-case v))
   
-  (define (little-cave? v)
-    "is the provided vertex lower-case and not 'start' or 'end'? (i.e. a one- or two-letter cave)"
-    (regexp-match? little-cave-regex v))
+          (define (little-cave? v)
+            "is the provided vertex lower-case and not 'start' or 'end'? (i.e. a one- or two-letter cave)"
+            (regexp-match? little-cave-regex v))
 
-  (define (doubled-member? lst)
-    "returns true if any member of a list is doubled"
-    (cond [(empty? lst) #f]
-          [else (if (member (first lst) (rest lst))
-                    #t
-                    (doubled-member? (rest lst)))]))
+          (define (doubled-member? lst)
+            "returns true if any member of a list is doubled"
+            (cond [(empty? lst) #f]
+                  [else (if (member (first lst) (rest lst))
+                            #t
+                            (doubled-member? (rest lst)))]))]
 
-  (define (next-path v visited hurry?)
-    (cond [(equal? v end) 1]                                       ; success, add 1 to path count
-          [(and (member v visited) hurry?) 0]                      ; in a hurry so no extra visits
-          [(and (equal? v start) (member start visited)) 0]        ; can't visit start twice
+    (define (next-path v visited hurry?)
+      (cond [(equal? v end) 1]                                       ; success, add 1 to path count
+            [(and (member v visited) hurry?) 0]                      ; in a hurry so no extra visits
+            [(and (equal? v start) (member start visited)) 0]        ; can't visit start twice
 
-          [else (cond [(not-big-cave? v)                           ; little cave or start?
-                       (set! visited (cons v visited))])           ; add to visited list
-                (cond [(doubled-member? visited)                   ; visited a little-cave twice?
-                       (set! hurry? #t)])                          ; now in a hurry
-                (next-paths (hash-ref graph v) visited hurry?)]))  ; continue search
+            [else (cond [(not-big-cave? v)                           ; little cave or start?
+                         (set! visited (cons v visited))])           ; add to visited list
+                  (cond [(doubled-member? visited)                   ; visited a little-cave twice?
+                         (set! hurry? #t)])                          ; now in a hurry
+                  (next-paths (hash-ref graph v) visited hurry?)]))  ; continue search
 
-  (define (next-paths lov visited hurry?)
-    (cond [(empty? lov) 0]
-          [else (+ (next-path (first lov) visited hurry?)
-                   (next-paths (rest lov) visited hurry?))]))
+    (define (next-paths lov visited hurry?)
+      (cond [(empty? lov) 0]
+            [else (+ (next-path (first lov) visited hurry?)
+                     (next-paths (rest lov) visited hurry?))]))
 
-  ; (trace next-path) 
-  (next-path start empty #f)) ; start the path search
+    ; (trace next-path) 
+    (next-path start empty #f))) ; start the path search
 
 (define (day12.2 graph)
   (leisurely-list-paths "start" "end" graph)) 
