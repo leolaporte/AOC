@@ -90,8 +90,8 @@
             (regexp-match? lower-case v))]
 
     (define (next-path v visited)
-      (cond [(member v visited) 0]       ; been there, done that, not a path
-            [(equal? v end) 1]           ; success, add 1 to path count
+      (cond [(equal? v end) 1]           ; success, add 1 to path count
+            [(member v visited) 0]       ; been there, done that, not a path
             [else (cond [(small-cave? v) (set! visited (cons v visited))]) ; don't revisit small caves
                   (next-paths (hash-ref graph v) visited)])) ; continue search
 
