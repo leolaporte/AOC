@@ -127,26 +127,25 @@
 ;; given a point on a grid structure, return a list of the 
 ;; surrounding points 
 (define (look-around p g)
-  (local [(define (in-row? a b) (equal? (quotient a (grid-width g)) (quotient b (grid-width g))))
-          (define (in-grid? x) (< -1 x (vector-length (grid-points g))))
-          (define left (sub1 p))
-          (define right (add1 p))
-          (define up (- p (grid-width g)))
-          (define down (+ p (grid-width g)))]
-    (if (in-grid? p)
-        (remove* '(-1) (list  ; this is so ugly, I should replace it with for/list
-                        (if (and (in-row? p left) (in-grid? left)) left  -1)
-                        (if (and (in-row? p right) (in-grid? right)) right -1)
-                        (if (in-grid? up) up -1)
-                        (if (in-grid? down) down -1)))
-        empty)))
+  (let* ([pos (point->pos p g)]
+         [x (car pos)]
+         [y (cdr pos)]
+         [width (grid-width g)]
+         [height (grid-height g)]
+         [l (cons (sub1 x) y)]
+         [r (cons (add1 x) y)]
+         [u (cons x (sub1 y))]
+         [d (cons x (add1 y))])
+    (define (in-grid? xy) (and (< -1 (car xy) width) (< -1 (cdr xy) height)))
+
+    (~>  (list u l r d)               ; the list of points as (x . y)
+         (filter in-grid? _)          ; remove points that are off the grid
+         (map (λ (x) (pos->point (car x) (cdr x) g)) _)))) ; convert (x . y) back to vector-ref
              
 (module+ test
-  (check-equal? (look-around 13 test-grid) (list 12 14 3 23))
+  (check-equal? (look-around 13 test-grid) (list 3 12 14 23))
   (check-equal? (look-around 0 test-grid) (list 1 10))
-  (check-equal? (look-around (pos->point 9 4 test-grid) test-grid) (list 48 39))
-  (check-equal? (look-around 220 test-grid) empty)
-  (check-equal? (look-around -1 test-grid) empty))
+  (check-equal? (look-around (pos->point 9 4 test-grid) test-grid) (list 39 48)))
 
 ;; Natural Natural Grid -> Boolean
 ;; given an x.y coordinate and the corresponding grid, return #true if it's a low point:
