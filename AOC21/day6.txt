@@ -135,11 +135,15 @@
 
 
 ;; Is there a mistake in the assignment? The example data is the same as the problem data!
+;; Oh no I see, 256 days for the SAMPLE data. 
 ;; well in any event the number of fish grows so large I can't store them in memory
 ;; so clearly I'm going to have to compress the results. Ah! That's what run-length
 ;; encoding is for. And by replacing that massive and exponentially larger (list-of fish)
 ;; with a vector of length 9 representing the number of fish at each day of maturity
-;; (0-8) I can massively reduce the compute time and memory requirements. 
+;; (0-8) I can massively reduce the compute time and memory requirements.
+
+(module+ test
+  (check-equal? (breed-lanternfish sample-data 256) 26984457539))
 
 (time (printf "2021 AOC Problem 6.2 = ~a\n" (breed-lanternfish input 256)))
 
