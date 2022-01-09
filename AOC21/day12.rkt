@@ -32,7 +32,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define graph-regex (pregexp "start|end|[a-z]{1,2}|[A-Z]{1,2}")) ; regex for conversion to graph
-(define small-cave-regex (regexp "[a-z]+"))  ; lower-case regex  
+(define lower-case (regexp "[a-z]+"))  ; lower-case regex  
 
 (define (list->hash list-of-edges)
   "makes an immutable hash from a list of edges such that
@@ -74,22 +74,25 @@
 
 ;; OK so now we need to count all the paths from start to end
 ;; allowing NO MORE than one visit to any small (lower-case) cave. That
-;; means we'll only add small caves to the seen queue.
+;; means we'll only add small caves to the seen queue. This is a
+;; depth-first search with backtracking using CAR/CDR recursion.
+;; The visited list goes with the search - each path has its own
+;; visited list. (In other words, no need to clear it.)
 
 ;; Vertex Vertex Graph -> Natural
 ;; Uses a depth-first search of graph to produce
 ;; a count of the number of paths from start to end that visit no lower
 ;; case vertex more than once
-(define (list-paths start end graph)
+(define (count-paths start end graph)
 
   (define (small-cave? v)
-    "is the provided vertex lower-case? (i.e. a small cave)"
-    (regexp-match? small-cave-regex v))
+    "is the provided vertex lower-case? (i.e. a small cave, start, or end)"
+    (regexp-match? lower-case v))
 
   (define (next-path v visited)
-    (cond [(member v visited) 0]               ; been there, done that, not a path
-          [(equal? v end) 1]                   ; success, add 1 to path count
-          [else (cond [(small-cave? v) (set! visited (cons v visited))]) ; don't revisit
+    (cond [(member v visited) 0]       ; been there, done that, not a path
+          [(equal? v end) 1]           ; success, add 1 to path count
+          [else (cond [(small-cave? v) (set! visited (cons v visited))]) ; don't revisit small caves
                 (next-paths (hash-ref graph v) visited)])) ; continue search
 
   (define (next-paths lov visited)
@@ -97,11 +100,11 @@
           [else (+ (next-path (first lov) visited)
                    (next-paths (rest lov) visited))]))
 
-  ;  (trace next-paths) 
+  ; (trace next-paths) 
   (next-path start empty))
 
 (define (day12.1 graph)
-  (list-paths "start" "end" graph)) 
+  (count-paths "start" "end" graph)) 
 
 (module+ test
   (check-equal? (day12.1 small) 10)
@@ -110,17 +113,81 @@
 
 (time (printf "2021 AOC Problem 12.1 = ~a\n" (day12.1 full)))
 
-;  
+;  --- Part Two ---
+; 
+; After reviewing the available paths, you realize you might have time to visit
+; a single small cave twice. Specifically, big caves can be visited any number of
+; times, a single small cave can be visited at most twice, and the remaining small
+; caves can be visited at most once. However, the caves named start and end can
+; only be visited exactly once each: once you leave the start cave, you may not
+; return to it, and once you reach the end cave, the path must end immediately.
+; 
+; Now, there are 36 possible paths through the first example
+; 
+; The slightly larger example above now has 103 paths through it, and the even larger
+; example now has 3509 paths through it.
+; 
+; Given these new rules, how many paths through this cave system are there? 
 ; 
 
 
-;(define (day12.2 data) 0) ; stub
-;
-;(module+ test
-;  (check-equal? (day12.2 test-data) 0))
-;
-;(time (printf "2021 AOC Problem 12.2 = ~a\n" (day12.2 problem-data)))
+;; Notes: I can reuse my path search. But the logic for terminating a path
+;; has changed: I can visit any one small cave twice, but the subsequent small
+;; caves can only be visited once. And start and end can only be visited once.
+;; I'll need to set a boolean once I've visited any small cave twice. Then
+;; the previous rules apply. I'll use hurry? as my boolean: it starts false
+;; but becomes true once we've visited a little cave twice.
+
+(define little-cave-regex (pregexp "^[a-z]{1,2}$"))  ; lower-case with one or two letters
+
+(define (leisurely-list-paths start end graph)
+
+  (define (not-big-cave? v)
+    "is the provided vertex lower-case? (i.e. a small cave start or end)"
+    (regexp-match? lower-case v))
+  
+  (define (little-cave? v)
+    "is the provided vertex lower-case and not 'start' or 'end'? (i.e. a one- or two-letter cave)"
+    (regexp-match? little-cave-regex v))
+
+  (define (doubled-member? lst)
+    "returns true if any member of a list is doubled"
+    (cond [(empty? lst) #f]
+          [else (if (member (first lst) (rest lst))
+                    #t
+                    (doubled-member? (rest lst)))]))
+
+  (define (next-path v visited hurry?)
+    (cond [(equal? v end) 1]                                       ; success, add 1 to path count
+          [(and (member v visited) hurry?) 0]                      ; in a hurry so no extra visits
+          [(and (equal? v start) (member start visited)) 0]        ; can't visit start twice
+
+          [else (cond [(not-big-cave? v)                           ; little cave or start?
+                       (set! visited (cons v visited))])           ; add to visited list
+                (cond [(doubled-member? visited)                   ; visited a little-cave twice?
+                       (set! hurry? #t)])                          ; now in a hurry
+                (next-paths (hash-ref graph v) visited hurry?)]))  ; continue search
+
+  (define (next-paths lov visited hurry?)
+    (cond [(empty? lov) 0]
+          [else (+ (next-path (first lov) visited hurry?)
+                   (next-paths (rest lov) visited hurry?))]))
+
+  ; (trace next-path) 
+  (next-path start empty #f)) ; start the path search
+
+(define (day12.2 graph)
+  (leisurely-list-paths "start" "end" graph)) 
+
+(module+ test
+  (check-equal? (day12.2 small) 36)
+  (check-equal? (day12.2 medium) 103)
+  (check-equal? (day12.2 large) 3509))
+
+(time (printf "2021 AOC Problem 12.2 = ~a\n" (day12.2 full)))
 
 ; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
-
-; Real world timing
+;2021 AOC Problem 12.1 = 5756
+;cpu time: 11 real time: 12 gc time: 0
+;2021 AOC Problem 12.2 = 144603
+;cpu time: 530 real time: 579 gc time: 19
