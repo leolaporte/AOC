@@ -173,7 +173,7 @@
 ;;
 ;; Vertical Fold: I don't need it in Part 1 but I might as well
 ;; make the folding function universal. For a point (x y) with
-;; an edge of (a b), if (zero? fold-line-h inst) then
+;; (fold-line a b), if (zero? fold-line-h inst) then
 ;; (x y) -> ((- (fold-line-v inst) (- x (fold-line-v inst))) y)
 ;; 
 ;; It's not as easy to drop the right half of a fold, however. Instead of
@@ -199,6 +199,24 @@
                 (pos->point 5 2 test-grid))
   (check-equal? (mirror-point (pos->point 10 5 test-grid) (fold-line 7 0) test-grid)
                 (pos->point 4 5 test-grid)))
+
+;; Grid Fold-Line -> Grid
+;; Given a Grid and a fold-line, mirrors the
+;; dots on the right or bottom side of the grid's
+;; point vector to the left or top side. 
+;; (depending on a vertical or horizontal fold-line)
+;; Assumes the fold-line is in the middle of the vector
+(define (mirror-points grid f)
+  (if (zero? (fold-line-v f))
+      "Make sure fold is in the middle"
+      (cond [(not (equal? (fold-line-h f)
+                          (quotient (grid-height grid) 2))) "Error: fold not in the middle"])
+      (cond [(not (equal? (fold-line-v f)
+                          (quotient (grid-width grid) 2))) "Error: fold not in the center"]))
+
+  
+ 
+  
 
 ;(define (day13.1 data) 0) ; stub
 ;
