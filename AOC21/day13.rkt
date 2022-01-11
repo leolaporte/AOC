@@ -205,18 +205,52 @@
 ;; dots on the right or bottom side of the grid's
 ;; point vector to the left or top side. 
 ;; (depending on a vertical or horizontal fold-line)
+;; returns the resulting Grid
 ;; Assumes the fold-line is in the middle of the vector
 (define (mirror-points grid f)
-  (if (zero? (fold-line-v f))
-      "Make sure fold is in the middle"
-      (cond [(not (equal? (fold-line-h f)
-                          (quotient (grid-height grid) 2))) "Error: fold not in the middle"])
-      (cond [(not (equal? (fold-line-v f)
-                          (quotient (grid-width grid) 2))) "Error: fold not in the center"]))
+  (let ([vec (grid-points grid)]
+        [w (grid-width grid)]
+        [h (grid-height grid)]
+        [horiz (fold-line-h f)]
+        [vert (fold-line-v f)])
+    
+    (cond [(zero? vert)     ; it's a horizontal fold
+           (cond [(not (equal? horiz (quotient h 2))) "Error: fold not in the middle"])
+           
+           (for ([i (in-range (pos->point vert (add1 horiz)) (* w h))])   ; bottom half of grid
+             (let ([mp (mirror-point i f grid)])                          ; the mirror point of i
+               (vector-set! vec mp (or (vector-ref i vec)                 ; set all the mirror points
+                                       (vector-ref mp vec)))))]
 
-  
- 
-  
+          [else             ; it's a vertical fold
+           (cond [(not (equal? vert (quotient w 2))) "Error: fold not in the center"])
+
+           (for ([y (in-range h)])                                        ; from top to bottom
+             (for ([x (in-range (add1 vert) w)])                          ; from center to right edge
+               (let* ([rsp (pos->point x y grid)]      ; right side point
+                      [mp (mirror-point rsp f grid)])  ; its mirror point
+                       
+                 (vector-set! vec mp (or (vector-ref rsp vec)
+                                         (vector-ref mp vec))))))])
+    
+    (grid w h vec)))
+
+;; Grid Fold-Line -> Grid
+;; given a grid and a fold line chops off the
+;; area below or to the right of the fold line
+(define (chop-grid g f)
+   (let ([vec (grid-points grid)]
+        [w (grid-width grid)]
+        [h (grid-height grid)]
+        [horiz (fold-line-h f)]
+        [vert (fold-line-v f)])
+     
+        (cond [(zero? vert)     ; it's a horizontal fold
+               (grid w horiz (vector-take vec (* w horiz)))]
+
+              [else             ; it's a vertical fold
+               (grid 0 0 (list->vector empty))])))
+          
 
 ;(define (day13.1 data) 0) ; stub
 ;
