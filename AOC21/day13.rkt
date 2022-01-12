@@ -26,12 +26,12 @@
          rackunit
          racket/trace)
 
-;; NOTES: Another Monday another fairly simple problem. I'll use the Grid structure
+;; NOTES: This seems a conceptually simple problem. I'll use the Grid structure
 ;; from Day 9. Looks like I'll have to calculate the height and width, and recalculate
 ;; it after every fold. I'll represent a dot with 1 and 0 for no dot. The only trick
 ;; here is to realign the vector after a fold, removing the folded part and if the fold
-;; isn't in the middle (i'm guessing it will never be) extending the grid on the opposite
-;; side by the overlap. It's just arithmetic. First, the data.
+;; isn't in the middle (i'm hoping it will be) extending the grid on the opposite
+;; side by the overlap. It's just (a lot of) arithmetic. First, the data.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                DATA                              ;;
@@ -139,11 +139,6 @@
   (let-values ([(y x) (quotient/remainder p (grid-width g))])
     (cons x y)))
 
-;; Natural Natural Grid -> Natural
-;; given a point and a grid, read the value at that point
-(define (get-value p g)
-  (vector-ref (grid-points g) p))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                               MAIN                               ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -151,10 +146,12 @@
 ;; Now to explore what "folding" means to a grid. According to the text
 ;; the fold line "disappears." So a fold at the line from (0,7) to (10,7)
 ;; on a paper of the dimensions 11x15 (the provided test data) results
-;; in a paper of 11x7 (sub1 (/ 15 2)). We don't have to worry about
+;; in a paper of 11x7 (- 15 7 1)). We don't have to worry about
 ;; the fold extending beyond the edges, at least in the test case, it's
 ;; always a fold in half on a odd number of lines, but that may be some-
-;; thing to watch in part 2.
+;; thing to watch in part 2. Folding vertically is a bit more
+;; complicated but it just requires truncating all the lines in
+;; the grid at the fold point.
 ;;
 ;; Next what is the transformation of a folded point on the grid?
 ;; For a point (x y) and (fold-line v h) the transformation is
@@ -177,11 +174,18 @@
 ;; (x y) -> ((- (fold-line-v inst) (- x (fold-line-v inst))) y)
 ;; 
 ;; It's not as easy to drop the right half of a fold, however. Instead of
-;; vector-take I'll have to do a vector-map with a lambda that chops off the
-;; right hand side. Save it for part 2. 
+;; vector-take I'll have to do a loop that chops off the
+;; right hand side. 
 ;;
 ;; In both cases resulting dot is the OR of the original value and new
 ;; value (or (5 4) (5 10)).
+
+;; So three functions, one to mirror a point on a grid
+;; another to mirror all the points on a grid
+;; a third to "fold" the grid by chopping it in half
+;; the only complication is that the arithmetic changes
+;; depending on whether it's a vertical or horizontal fold
+;; so each function will have to offer both methods.
 
 ;; Natural Fold-Line Grid -> Natural
 ;; Given a point and a fold-line on a grid
@@ -217,10 +221,10 @@
     (cond [(zero? vert)     ; it's a horizontal fold
            (cond [(not (equal? horiz (quotient h 2))) "Error: fold not in the middle"])
            
-           (for ([i (in-range (pos->point vert (add1 horiz)) (* w h))])   ; bottom half of grid
+           (for ([i (in-range (pos->point vert (add1 horiz) grid) (* w h))])   ; bottom half of grid
              (let ([mp (mirror-point i f grid)])                          ; the mirror point of i
-               (vector-set! vec mp (or (vector-ref i vec)                 ; set all the mirror points
-                                       (vector-ref mp vec)))))]
+               (vector-set! vec mp (or (vector-ref vec i)                 ; set all the mirror points
+                                       (vector-ref vec)))))]
 
           [else             ; it's a vertical fold
            (cond [(not (equal? vert (quotient w 2))) "Error: fold not in the center"])
@@ -228,8 +232,7 @@
            (for ([y (in-range h)])                                        ; from top to bottom
              (for ([x (in-range (add1 vert) w)])                          ; from center to right edge
                (let* ([rsp (pos->point x y grid)]      ; right side point
-                      [mp (mirror-point rsp f grid)])  ; its mirror point
-                       
+                      [mp (mirror-point rsp f grid)])  ; its mirror point                 
                  (vector-set! vec mp (or (vector-ref rsp vec)
                                          (vector-ref mp vec))))))])
     
@@ -238,24 +241,33 @@
 ;; Grid Fold-Line -> Grid
 ;; given a grid and a fold line chops off the
 ;; area below or to the right of the fold line
-(define (chop-grid g f)
-   (let ([vec (grid-points grid)]
-        [w (grid-width grid)]
-        [h (grid-height grid)]
-        [horiz (fold-line-h f)]
-        [vert (fold-line-v f)])
-     
-        (cond [(zero? vert)     ; it's a horizontal fold
-               (grid w horiz (vector-take vec (* w horiz)))]
+(define (fold-grid g f)
+  (let* ([vec (grid-points g)]
+         [w (grid-width g)]
+         [h (grid-height g)]
+         [horiz (fold-line-h f)]
+         [vert (fold-line-v f)]
+         [new-vec (make-vector (* vert h))])
+    
+    (cond [(zero? vert)     ; it's a horizontal fold
+           (grid w horiz (vector-take vec (* w horiz)))]
 
-              [else             ; it's a vertical fold
-               (grid 0 0 (list->vector empty))])))
+          [else             ; it's a vertical fold
+           (grid vert h (list->vector (apply append
+                               (for/list ([y (in-range 0 h)])
+                                 ; go from top to bottom of grid and copy the left half 
+                                 (vector->list (vector-copy vec (* y w) (+ (* y w) vert)))))))])))
           
+(define (day13.1 a-grid fold)
+  (~> a-grid                                    ; given a grid and a fold-line
+      (mirror-points _ fold)                    ; mirror all the points
+      (fold-grid _ fold)                        ; make the fold
+      (grid-points _)                           ; take the resulting vector
+      (vector-count (λ (val) (= val DOT)) _)))  ; and count the dots
 
-;(define (day13.1 data) 0) ; stub
-;
-;(module+ test
-; (check-equal? (day13.1 sample-data) 17))
+(module+ test
+ (check-equal? (day13.1 test-grid (first test-inst)) 17))
+
 ;
 ;(time (printf "2021 AOC Problem 13.1 = ~a\n" (day13.1 day13data)))
 
