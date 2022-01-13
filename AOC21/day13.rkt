@@ -280,7 +280,7 @@
 ;;; What code do you use to activate the infrared thermal imaging camera system?
 
 ;;; NOTES: I've already written the code to finish the folds, but do I REALLY
-;;; have to recognize the letters? Can I do that part by hand?
+;;; have to write an OCR to recognize the letters? Can I do that part by hand?
 ;;; I guess I'll have to write code to display the result?
 
 (define (fold-paper a-grid inst-list)
@@ -290,21 +290,39 @@
     (values
      (fold-grid (mirror-points g inst) inst))))
 
-(module+ test
-  (check-equal? (fold-paper test-grid test-inst)
-                (grid 5 7 (list->vector '(#t #t #t #t #t
-                                             #t #f #f #f #t
-                                             #t #f #f #f #t
-                                             #t #f #f #f #t
-                                             #t #t #t #t #t
-                                             #f #f #f #f #f
-                                             #f #f #f #f #f))))) ; it's an O
+;; Grid -> ASCII Text
+;; given a grid, display it
+(define (display-grid g)
+  (for ([y (in-range (grid-height g))])
+    (for ([x (in-range (grid-width g))])
+      (if (false? (vector-ref (grid-points g) (pos->point x y g)))
+          (display #\ )
+          (display #\█)))
+    (display "\n")))
 
-(time (printf "2021 AOC Problem 13.2 = ~a\n" (fold-paper input-grid input-inst)))
+(define (day13.2 g i)
+  (display-grid (fold-paper g i)))
+
+(day13.2 test-grid test-inst)
+
+(time (printf "2021 AOC Problem 13.2 = ~a\n" (day13.2 input-grid input-inst)))
 
 ; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
 ;2021 AOC Problem 13.1 = 755
-;cpu time: 233 real time: 244 gc time: 46
-;2021 AOC Problem 13.2 = "BLKJRBAG"
-;cpu time: 396 real time: 416 gc time: 73
+;cpu time: 443 real time: 451 gc time: 97
+;█████
+;█   █
+;█   █
+;█   █
+;█████
+;     
+;     
+;███  █    █  █   ██ ███  ███   ██   ██  
+;█  █ █    █ █     █ █  █ █  █ █  █ █  █ 
+;███  █    ██      █ █  █ ███  █  █ █    
+;█  █ █    █ █     █ ███  █  █ ████ █ ██ 
+;█  █ █    █ █  █  █ █ █  █  █ █  █ █  █ 
+;███  ████ █  █  ██  █  █ ███  █  █  ███ 
+;2021 AOC Problem 13.2 = #<void>
+;cpu time: 784 real time: 793 gc time: 175
 
