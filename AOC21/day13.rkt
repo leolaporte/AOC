@@ -5,20 +5,6 @@
 ;;; 
 ;;; --- Day 13: Transparent Origami ---
 ;;; 
-;;; The first section is a list of dots on the transparent paper.
-;;;
-;;; Then, there is a list of fold instructions. Each instruction indicates a line
-;;; on the transparent paper and wants you to fold the paper up (for horizontal y=... lines)
-;;; or left (for vertical x=... lines). In this example, the first fold instruction
-;;; is fold along y=7, which designates the line formed by all of the positions 
-;;; where y is 7 (marked here with -):
-;;; 
-;;; Because this is a horizontal line, fold the bottom half up. Some of the dots
-;;; might end up overlapping after the fold is complete, but dots will never appear
-;;; exactly on a fold line.
-;;; 
-;;; Now, only 17 dots are visible.
-;;; 
 ;;; How many dots are visible after completing just the first fold instruction
 ;;; on your transparent paper?
 
@@ -28,10 +14,9 @@
 
 ;; NOTES: This seems a conceptually simple problem. I'll use the Grid structure
 ;; from Day 9. Looks like I'll have to calculate the height and width, and recalculate
-;; it after every fold. I'll represent a dot with 1 and 0 for no dot. The only trick
-;; here is to realign the vector after a fold, removing the folded part and if the fold
-;; isn't in the middle (i'm hoping it will be) extending the grid on the opposite
-;; side by the overlap. It's just (a lot of) arithmetic. First, the data.
+;; it after every fold. I'll represent a dot with 1 and 0 for no dot. I notice
+;; that the fold is always along the middle, I'm hoping Eric doesn't get too devilish
+;; in part 2, but I'll assume it's always the middle.  First, the data.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                DATA                              ;;
@@ -43,11 +28,6 @@
 ;; where width and height are the dimensions of a rectangular grid
 ;; and points is a vector containing all the data points in
 ;; the structure
-
-(struct fold-line (v h) #:transparent)
-;; a fold-line is a structure
-;; where v is a point on a grid where a vertical fold occurs
-;; and h is the point where a horizontal fold begins.
 
 (define DOT 1)
 (define EMPTY 0)
@@ -97,21 +77,19 @@
 
 ;; Now to parse the instructions. The text is something like:
 ;; "fold along y=7" - all I really care about is x or y for
-;; vertical or horizontal fold and the number for the row or col
-;; How about I represent the instruction as (0 7) for a fold
-;; across the middle at row 7 and (7 0) for a fold down the middle
-;; at column 7? Let's try that with a fold-line structure. 
+;; vertical or horizontal fold and the number for the row or col.
 
 (define (inst->points str)
+  "given a text instruction parse it to a direction and fold-ppint"
   (let* ([s (string-split str "\n")]
-         [inst-list (map (λ (x) (rest (regexp-match #px"([a-z])=(\\d+)" x))) s)])
+         [inst-list (map (λ (x) (rest (regexp-match #px"([a-z]{1})=(\\d+)" x))) s)])
     
-    (define (pair->fold-line lst)
-      (if (equal? (first lst) "x") 
-          (fold-line (string->number (second lst)) 0)     ; vertical fold
-          (fold-line 0 (string->number (second lst)))))   ; horiz fold
- 
-    (map (λ (p) (pair->fold-line p)) inst-list)))
+    (map (λ (p) (if (equal? (first p) "x")
+                    (list '↓ (string->number (second p)))
+                    (list '→ (string->number (second p))))) inst-list)))
+
+(module+ test
+  (check-equal? (inst->points "fold along y=7\nfold along x=5\n") (list (list '→ 7) (list '↓ 5))))
 
 ;; OK let's parse some data!
 
@@ -154,119 +132,170 @@
 ;; the grid at the fold point.
 ;;
 ;; Next what is the transformation of a folded point on the grid?
-;; For a point (x y) and (fold-line v h) the transformation is
+;; For a point (x y) the transformation is
 ;;
-;; If (zero? (fold-line-v inst)) then it's a Horizontal Fold so
-;; (5 10) with a (0 7) fold becomes (5 4)
-;; In other words (x y) becomes (x (- (fold-line-h inst) (- y (fold-line-h inst))
-;;
-;; So for a vector v folded horizontally at (fold-line v h) the point (x y) moves:
-;; (vector-set! v (pos->point x (- h (- y h)))
-;;             (or (vector-ref v (pos->point x y)) (pos->point x (- h (- y h)))))
+;; If '→ then it's a Horizontal Fold so the mirror point of (x y)
+;; is (x, (- (quotient grid-height 2) (- y (quotient grid-height 2))))
+;; In other words (5,10) with a mid-line of 7 becomes (5, (- 7 (- 10 7))
+;; or (5,4)
 ;; 
 ;; After all adjustments are made we drop the bottom
 ;; half of the vector and adjust the new height to get
-;; a new grid with the same width, height b, (vector-take vec b)).
+;; a new grid with the same width and a height of (quotient grid-height 2)
 ;;
 ;; Vertical Fold: I don't need it in Part 1 but I might as well
-;; make the folding function universal. For a point (x y) with
-;; (fold-line a b), if (zero? fold-line-h inst) then
-;; (x y) -> ((- (fold-line-v inst) (- x (fold-line-v inst))) y)
+;; make the folding function universal.
+;; If '↓ then it's a Vertical Fold so the mirror point of (x y)
+;; is ((- (quotient grid-height 2) (- x (quotient grid-height 2))) y)
+;; In other words (8,6) with a center-line of 5 becomes ((- 5 (- 8 5))
+;; or (2,6)
 ;; 
 ;; It's not as easy to drop the right half of a fold, however. Instead of
 ;; vector-take I'll have to do a loop that chops off the
 ;; right hand side. 
 ;;
-;; In both cases resulting dot is the OR of the original value and new
-;; value (or (5 4) (5 10)).
+;; In both cases the mirror dot is the OR of the original value and the
+;; mirror dot. (If either is set the mirror is set, if both are empty,
+;; then the mirror dot is empty.)
 
 ;; So three functions, one to mirror a point on a grid
 ;; another to mirror all the points on a grid
 ;; a third to "fold" the grid by chopping it in half
-;; the only complication is that the arithmetic changes
+;; and then we have to count the dots in the resulting
+;; vector.
+;;
+;; The only complication is that the arithmetic changes
 ;; depending on whether it's a vertical or horizontal fold
 ;; so each function will have to offer both methods.
 
-;; Natural Fold-Line Grid -> Natural
+;; Natural symbol Grid -> Natural
 ;; Given a point and a fold-line on a grid
 ;; produce the mirror point on the grid
-(define (mirror-point p f grid)
-  (let ([x (car (point->pos p grid))]
-        [y (cdr (point->pos p grid))])
+(define (mirror-point pt inst grid)
+  (let ([x (car (point->pos pt grid))]
+        [y (cdr (point->pos pt grid))]
+        [fp (second inst)])
     
-    (if (zero? (fold-line-v f))      
-        (pos->point x (- (fold-line-h f) (- y (fold-line-h f))) grid)    ; horizontal fold
-        (pos->point (- (fold-line-v f) (- x (fold-line-v f))) y grid)))) ; vertical fold
+    (if (equal? (first inst) '→)      
+        (pos->point x (- fp (- y fp)) grid)    ; horizontal fold
+        (pos->point (- fp (- x fp)) y grid)))) ; vertical fold
 
 (module+ test
-  (check-equal? (mirror-point (pos->point 5 12 test-grid) (fold-line 0 7) test-grid)
+  (check-equal? (mirror-point (pos->point 5 12 test-grid) (list '→ 7) test-grid)
                 (pos->point 5 2 test-grid))
-  (check-equal? (mirror-point (pos->point 10 5 test-grid) (fold-line 7 0) test-grid)
+  (check-equal? (mirror-point (pos->point 10 5 test-grid) (list '↓ 7) test-grid)
                 (pos->point 4 5 test-grid)))
 
-;; Grid Fold-Line -> Grid
-;; Given a Grid and a fold-line, mirrors the
-;; dots on the right or bottom side of the grid's
-;; point vector to the left or top side. 
-;; (depending on a vertical or horizontal fold-line)
-;; returns the resulting Grid
-;; Assumes the fold-line is in the middle of the vector
-(define (mirror-points grid f)
-  (let ([vec (grid-points grid)]
-        [w (grid-width grid)]
-        [h (grid-height grid)]
-        [horiz (fold-line-h f)]
-        [vert (fold-line-v f)])
+;; Grid Natural -> (vector-of Natural)
+;; Given a grid and a horizontal fold line, mirror
+;; all the points below the fold to above
+;; the fold and return the resulting vector
+(define (mirror-points-h g inst)
+  (let* ([vec (grid-points g)]
+         [fp (second inst)]
+         [start (pos->point 0 (add1 fp) g)]                ; first point of bottom half
+         [end (vector-length vec)])                        ; last point of bottom half
     
-    (cond [(zero? vert)     ; it's a horizontal fold
-           (cond [(not (equal? horiz (quotient h 2))) "Error: fold not in the middle"])
-           
-           (for ([i (in-range (pos->point vert (add1 horiz) grid) (* w h))])   ; bottom half of grid
-             (let ([mp (mirror-point i f grid)])                          ; the mirror point of i
-               (vector-set! vec mp (or (vector-ref vec i)                 ; set all the mirror points
-                                       (vector-ref vec)))))]
+    (for ([bhp (in-range start end)])                      ; bottom half of grid
+      (let ([mp (mirror-point bhp inst g)])                ; the mirror point of bp
+        (vector-set! vec mp (or (vector-ref vec bhp)       ; set the mirror point
+                                (vector-ref vec mp)))))
+    vec))
 
-          [else             ; it's a vertical fold
-           (cond [(not (equal? vert (quotient w 2))) "Error: fold not in the center"])
+(module+ test
+  (check-equal? (mirror-points-h (grid 3 3 (list->vector '(0 0 0
+                                                           0 0 0
+                                                           1 1 1))) (list '→ 1))
+                 (list->vector '(1 1 1
+                                 0 0 0
+                                 1 1 1)))
 
-           (for ([y (in-range h)])                                        ; from top to bottom
-             (for ([x (in-range (add1 vert) w)])                          ; from center to right edge
-               (let* ([rsp (pos->point x y grid)]      ; right side point
-                      [mp (mirror-point rsp f grid)])  ; its mirror point                 
-                 (vector-set! vec mp (or (vector-ref rsp vec)
-                                         (vector-ref mp vec))))))])
-    
-    (grid w h vec)))
+  (check-equal? (mirror-points-h (grid 3 3 (list->vector '(0 1 0
+                                                           0 0 0
+                                                           1 1 1))) (list '→ 1))
+                 (list->vector '(1 1 1
+                                 0 0 0
+                                 1 1 1))))
 
-;; Grid Fold-Line -> Grid
-;; given a grid and a fold line chops off the
+
+;; Grid Natural -> (vector-of Natural)
+;; Given a grid and a vertical fold line, mirror
+;; all the points to the right of the fold to
+;; the left side of the fold and rerturn the resulting vector
+(define (mirror-points-v g inst)
+  (let ([fp (second inst)]
+        [w (grid-width g)]
+        [h (grid-height g)]
+        [vec (grid-points g)])
+  
+    (for ([y (in-range h)])                                  ; from top to bottom
+      (for ([x (in-range fp w)])                             ; from center to right edge
+        (let* ([rsp (pos->point x y g)]                      ; right side point
+               [mp (mirror-point rsp inst g)])               ; its mirror point                 
+          (vector-set! vec mp (or (vector-ref vec rsp)       ; set the mirror point
+                                  (vector-ref vec mp))))))
+    vec))
+
+(module+ test
+  (check-equal? (mirror-points-v (grid 3 3 (list->vector '(0 0 1
+                                                           0 0 1
+                                                           0 0 1))) (list '↓ 1))
+                 (list->vector '(1 0 1
+                                 1 0 1
+                                 1 0 1)))
+
+  (check-equal? (mirror-points-v (grid 3 3 (list->vector '(1 0 1
+                                                           0 0 1
+                                                           0 0 1))) (list '↓ 1))
+                 (list->vector '(1 0 1
+                                 1 0 1
+                                 1 0 1))))
+
+;; Grid Instruction -> Grid
+;; given a grid and a fold instruction
+;; mirror points on one half of the fold
+;; to the other half
+(define (mirror-points g inst)
+  (grid (grid-width g) (grid-height g)
+        (cond [(equal? (first inst) '→)                                 ; it's a horizontal fold
+               (mirror-points-h g inst)]
+              [else                                                     ; it's a vertical fold
+               (mirror-points-v g inst)])))
+
+;; Grid Inst -> Grid
+;; given a grid and an instruction chops off the
 ;; area below or to the right of the fold line
-(define (fold-grid g f)
+(define (fold-grid g inst)
   (let* ([vec (grid-points g)]
          [w (grid-width g)]
          [h (grid-height g)]
-         [horiz (fold-line-h f)]
-         [vert (fold-line-v f)]
-         [new-vec (make-vector (* vert h))])
+         [fp (second inst)])
     
-    (cond [(zero? vert)     ; it's a horizontal fold
-           (grid w horiz (vector-take vec (* w horiz)))]
+    (cond [(equal? (first inst) '→)                            ; it's a horizontal fold
+           (grid w fp (vector-take vec (* w fp)))]     ; chop off bottom half
 
-          [else             ; it's a vertical fold
-           (grid vert h (list->vector (apply append
-                               (for/list ([y (in-range 0 h)])
-                                 ; go from top to bottom of grid and copy the left half 
-                                 (vector->list (vector-copy vec (* y w) (+ (* y w) vert)))))))])))
+          [else                                               ; it's a vertical fold
+           (grid fp h (list->vector
+                              (apply append (for/list ([y (in-range 0 h)])
+                                              ; go from top to bottom of grid and copy the left half 
+                                              (vector->list (vector-copy vec (* y w) (+ (* y w) fp)))))))])))
+
+(module+ test
+  (check-equal? (fold-grid (grid 3 3 (list->vector '(1 2 3 4 5 6 7 8 9))) (list '↓ 1))
+                (grid 1 3 (list->vector '(1 4 7))))
+  (check-equal? (fold-grid (grid 3 3 (list->vector '(1 2 3 4 5 6 7 8 9))) (list '→ 1))
+                (grid 3 1 (list->vector '(1 2 3)))))
+
           
-(define (day13.1 a-grid fold)
+(define (day13.1 a-grid inst)
   (~> a-grid                                    ; given a grid and a fold-line
-      (mirror-points _ fold)                    ; mirror all the points
-      (fold-grid _ fold)                        ; make the fold
+      (mirror-points _ inst)                    ; mirror all the points
+      (fold-grid _ inst)                        ; make the fold
       (grid-points _)                           ; take the resulting vector
       (vector-count (λ (val) (= val DOT)) _)))  ; and count the dots
 
 (module+ test
- (check-equal? (day13.1 test-grid (first test-inst)) 17))
+  x(check-equal? (day13.1 test-grid (first test-inst)) 17))
 
 ;
 ;(time (printf "2021 AOC Problem 13.1 = ~a\n" (day13.1 day13data)))
