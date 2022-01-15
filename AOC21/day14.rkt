@@ -52,49 +52,12 @@ of the most common element and subtract the quantity of the least common element
 (define-values (test-polymer test-rules) (values (first raw-test)
                                                  (make-rule-hash (second raw-test))))
 
-
-(define (string->pairs str)
-  "return a list of all the side-by-side character pairs in the string"
-  (for/list ([i (in-range (sub1 (string-length str)))])
-    (substring str i (+ i 2))))
-
-(define (hash-key+ hash key num)
-  "If the key exists add num to existing value, otherwise insert key into hash with value of num"
-  (if (hash-has-key? hash key)
-      (hash-set! hash key (+ num (hash-ref hash key)))
-      (hash-set! hash key num)))
-
-(define (make-element-hash str)
-  "given a polymer string make a hash of each element -> count"
-  (let ([h (make-hash)])
-    (for ([i (in-range (string-length str))])
-      (hash-key+ h (substring str i (add1 i)) 1))
-    h))
-
-(define (make-pair-hash str)
-  "make a hash of all two char pairs in str"
-  (let ([h (make-hash)]
-        [pairs (string->pairs str)])
-    (for ([p (in-list pairs)])
-      (hash-key+ h p 1))
-    h))
-
-(define (new-pairs pair element)
-  "inserts a character into the middle of a character pair, returns resulting string pairs"
-  (string->pairs (string-append (substring pair 0 1) element (substring pair 1 2))))
-    
-(define test-pair-hash (make-pair-hash test-polymer))  
-(define input-pair-hash (make-pair-hash input-polymer))
-
-(define test-element-hash (make-element-hash test-polymer))
-(define input-element-hash (make-element-hash input-polymer))
-
 #|==============================================================================|#
 #|                                     NOTES                                    |#
 #|==============================================================================|#
 
 #|
-I did a little math (below) and the size of the string almost doubles every
+According to the problem text, the size of the polymer string almost doubles every
 iteration. 10 is tolerable but it grows very fast. So I'll need some way
 to represent the data I want to track. Shades of Lanternfish!
 
@@ -107,7 +70,41 @@ Let's see...
 #|==============================================================================|#
 #|                                     CODE                                     |#
 #|==============================================================================|#
- 
+
+;; First some helper functions
+
+(define (string->pairs str)
+  "return a list of all the side-by-side character pairs in the string"
+  (for/list ([i (in-range (sub1 (string-length str)))])
+    (substring str i (+ i 2))))
+
+(define (hash-key+ hash key num)
+  "If a key exists add num to existing value, otherwise insert key into hash with value of num"
+  (if (hash-has-key? hash key)
+      (hash-set! hash key (+ num (hash-ref hash key)))
+      (hash-set! hash key num)))
+
+(define (make-element-hash str)
+  "given a polymer string make a hash with keys of elements and values of element count"
+  (let ([h (make-hash)])
+    (for ([i (in-range (string-length str))])
+      (hash-key+ h (substring str i (add1 i)) 1))
+    h))
+
+(define (make-pair-hash str)
+  "make a hash of all two char pairs in a polymer"
+  (let ([h (make-hash)]
+        [pairs (string->pairs str)])
+    (for ([p (in-list pairs)])
+      (hash-key+ h p 1))
+    h))
+
+(define (new-pairs pair element)
+  "inserts a character into the middle of a character pair, returns resulting string pairs"
+  (string->pairs (string-append (substring pair 0 1) element (substring pair 1 2))))
+
+;; Now the meat
+    
 ;; String Hash Natural -> Hash
 ;; Given a polymer string, a hash of insertion rules in the form of "AB" -> "C"
 ;; update the hash for each element inserted with
@@ -116,7 +113,7 @@ Let's see...
 
   (for/fold ([ph pairs]        ; accumulate the pairs in the polymer with their count
              [els elements]    ; accumulate the number of elements inserted
-             #:result (values ph els))
+             #:result (cons ph els))
              
             ([pair (in-list (hash-keys pairs))])  ; go through all the pairs in the polymer to date
 
@@ -126,16 +123,29 @@ Let's see...
              (hash-key+ ph p 1))])                                      ; increment these pairs in the pair hash
     (values ph els)))                                                   ; store resulting hashes in accumulators
 
+;; String Hash Natural -> Natural
+;; Given a polymer string and a hash of insertion rules produce the
+;; difference between the most used and least used element after
+;; the given number of insertion iterations
+(define (day14.1 polymer rules iterations)
+  (define pairs (make-pair-hash polymer))       ; make a hash of all the pairs in the starting polymer
+  (define elements (make-element-hash polymer)) ; ditto elements
+
+  (define (insert-elements ps els iter)         ; insert elements into polymer iter times
+    (cond [(zero? iter) els]
+          [else
+           (let ([res (insert-element polymer rules ps els)])
+             (insert-elements (car res) (cdr res) (sub1 iter)))]))
+
+  (let* ([element-counts (insert-elements pairs elements iterations)]
+        [max (apply max (hash-values element-counts))]
+        [min (apply min (hash-values element-counts))])
+    (- max min)))
+
 (module+ test
-  (check-equal? (insert-element test-polymer test-rules test-pair-hash test-element-hash)
-                (values (make-pair-hash "NCNBCHB") (make-element-hash "NCNBCHB"))))
+ (check-equal? (day14.1 test-polymer test-rules 10) 1588))
 
-; (define (day14.1 d) 0) ; stub
-
-; (module+ test
-;   (day14.1 test-data) 1588)
-
-; (time (printf "2021 AOC Problem 14.1 = ~a\n" (day14.1 input)))
+; (time (printf "2021 AOC Problem 14.1 = ~a\n" (day14.1 input-polymer input-rules 10)))
 
 
 #|
