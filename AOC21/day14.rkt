@@ -78,11 +78,24 @@ Let's see...
   (for/list ([i (in-range (sub1 (string-length str)))])
     (substring str i (+ i 2))))
 
+(module+ test
+  (check-equal? (string->pairs "ABCD")
+                (list "AB" "BC" "CD"))
+  (check-equal? (string->pairs "ABCDEFG")
+                (list "AB" "BC" "CD" "DE" "EF" "FG")))
+
 (define (hash-key+ hash key num)
   "If a key exists add num to existing value, otherwise insert key into hash with value of num"
   (if (hash-has-key? hash key)
       (hash-set! hash key (+ num (hash-ref hash key)))
-      (hash-set! hash key num)))
+      (hash-set! hash key num))
+  hash)
+
+(module+ test
+  (check-equal? (hash-key+ (make-hash '(("A" . 1) ("B" . 2) ("C" . 3))) "C" 10)
+                (make-hash '(("A" . 1) ("B" . 2) ("C" . 13))))
+  (check-equal? (hash-key+ (make-hash '(("A" . 1) ("B" . 2) ("C" . 3))) "D" 10)
+                (make-hash '(("A" . 1) ("B" . 2) ("C" . 3) ("D" . 10)))))
 
 (define (make-element-hash str)
   "given a polymer string make a hash with keys of elements and values of element count"
@@ -90,6 +103,12 @@ Let's see...
     (for ([i (in-range (string-length str))])
       (hash-key+ h (substring str i (add1 i)) 1))
     h))
+
+(module+ test
+  (check-equal? (make-element-hash "ABC")
+                (make-hash '(("A" . 1) ("B" . 1) ("C" . 1))))
+  (check-equal? (make-element-hash "ABCC")
+                (make-hash '(("A" . 1) ("B" . 1) ("C" . 2)))))
 
 (define (make-pair-hash str)
   "make a hash of all two char pairs in a polymer"
@@ -99,9 +118,19 @@ Let's see...
       (hash-key+ h p 1))
     h))
 
+(module+ test
+  (check-equal? (make-pair-hash "ABC")
+                (make-hash '(("AB" . 1) ("BC" . 1))))
+  (check-equal? (make-pair-hash "ABCDCD")
+                (make-hash '(("AB" . 1) ("BC" . 1) ("CD" . 2) ("DC" . 1)))))
+
 (define (new-pairs pair element)
   "inserts a character into the middle of a character pair, returns resulting string pairs"
   (string->pairs (string-append (substring pair 0 1) element (substring pair 1 2))))
+
+(module+ test
+  (check-equal? (new-pairs "AB" "C")
+                (list "AC" "CB")))
 
 ;; Now the meat
     
@@ -142,8 +171,8 @@ Let's see...
         [min (apply min (hash-values element-counts))])
     (- max min)))
 
-(module+ test
- (check-equal? (day14.1 test-polymer test-rules 10) 1588))
+;(module+ test
+ ;(check-equal? (day14.1 test-polymer test-rules 10) 1588))
 
 ; (time (printf "2021 AOC Problem 14.1 = ~a\n" (day14.1 input-polymer input-rules 10)))
 
