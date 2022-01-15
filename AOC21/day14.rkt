@@ -136,8 +136,8 @@ Let's see...
     
 ;; String Hash Natural -> Hash
 ;; Given a polymer string, a hash of insertion rules in the form of "AB" -> "C"
-;; update the hash for each element inserted with
-;; a count of the number of total inertions: "A" -> 123
+;; update the hash for each element inserted with a count of the number of total
+;; insertions: "A" -> 123
 (define (insert-element polymer rules pairs elements)
 
   (for/fold ([ph pairs]        ; accumulate the pairs in the polymer with their count
@@ -171,10 +171,10 @@ Let's see...
         [min (apply min (hash-values element-counts))])
     (- max min)))
 
-;(module+ test
- ;(check-equal? (day14.1 test-polymer test-rules 10) 1588))
+(module+ test
+ (check-equal? (day14.1 test-polymer test-rules 10) 1588))
 
-; (time (printf "2021 AOC Problem 14.1 = ~a\n" (day14.1 input-polymer input-rules 10)))
+(time (printf "2021 AOC Problem 14.1 = ~a\n" (day14.1 input-polymer input-rules 10)))
 
 
 #|
@@ -183,10 +183,6 @@ Part Two
 
 |#
 
-; (define (day14.2 d) 0) ; stub
+(time (printf "2021 AOC Problem 14.2 = ~a\n" (day14.1 input-polymer input-rules 40)))
 
-; (module+ test
-;   (day14.2 test-data) 1588)
-
-; (time (printf "2021 AOC Problem 14.1 = ~a\n" (day14.1 input)))
 ; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
