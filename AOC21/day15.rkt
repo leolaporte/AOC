@@ -88,6 +88,9 @@ function.
   (let-values ([(y x) (quotient/remainder p (grid-width g))])
     (cons x y)))
 
+(define (value p g)
+  (vector-ref (grid-points g) p))
+
 ;; Natural Grid -> (list-of Natural)
 ;; given a point on a grid structure, return a list of the 
 ;; surrounding points 
@@ -108,22 +111,22 @@ function.
          (map (λ (x) (pos->point (car x) (cdr x) g)) _)))) ; convert (x . y) back to vector-ref
 
 (define (day15.1 g)
-  (let ([end (sub1 (vector-length (grid-points g)))])  
+  (define end (sub1 (vector-length (grid-points g))))    ; the destination point, last point on grid
     
   (define (next-step p g risk max-risk visited)
-    (cond [(equal? p end) (set! max-risk risk) max-risk]
-          [(>= risk max-risk) risk]
-          [(not (false? (member p visited))) max-risk]
-          [else (set! risk (+ risk (vector-ref (grid-points g) p)))
-                (set! visited (cons p visited))
-                (next-steps (look-around p g) g risk max-risk visited)]))
+    (cond [(equal? p end) (set! max-risk risk) max-risk] ; at the end, return the risk, make it max
+          [(>= risk max-risk) risk]                      ; stop when max is exceded
+          [(not (false? (member p visited))) max-risk]   ; don't revisit points
+          [else (set! risk (+ risk (value p g)))         ; point is ok, add value to risk
+                (set! visited (cons p visited))          ; add point to visited
+                (next-steps (look-around p g) g risk max-risk visited)])) ; look for next move
 
     (define (next-steps lop g risk max-risk visited)
       (cond [(empty? lop) max-risk]
             [else (min (next-step (first lop) g risk max-risk visited)
                        (next-steps (rest lop) g risk max-risk visited))]))
   
-  (next-step 0 g 0 (apply + (vector->list (grid-points g))) empty)))
+  (next-step 0 g 0 (apply + (vector->list (grid-points g))) empty))
 
 (module+ test
   (check-equal? (day15.1 test-grid) 40))
