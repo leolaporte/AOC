@@ -114,19 +114,20 @@ function.
   (define end (sub1 (vector-length (grid-points g))))    ; the destination point, last point on grid
     
   (define (next-step p g risk max-risk visited)
+ ;  (printf "Point: ~a - Risk: ~a - Max: ~a\nVisited: ~a\n\n\n" p risk max-risk visited)
     (cond [(equal? p end) (set! max-risk risk) max-risk] ; at the end, return the risk, make it max
           [(>= risk max-risk) risk]                      ; stop when max is exceded
           [(not (false? (member p visited))) max-risk]   ; don't revisit points
           [else (set! risk (+ risk (value p g)))         ; point is ok, add value to risk
                 (set! visited (cons p visited))          ; add point to visited
                 (next-steps (look-around p g) g risk max-risk visited)])) ; look for next move
-
+  
     (define (next-steps lop g risk max-risk visited)
       (cond [(empty? lop) max-risk]
             [else (min (next-step (first lop) g risk max-risk visited)
                        (next-steps (rest lop) g risk max-risk visited))]))
   
-  (next-step 0 g 0 (apply + (vector->list (grid-points g))) empty))
+  (next-step 0 g 0 41 empty))
 
 (module+ test
   (check-equal? (day15.1 test-grid) 40))
