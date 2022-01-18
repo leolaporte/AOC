@@ -1,7 +1,7 @@
 #lang racket
 
 ;AOC Day 14
-;Leo Laporte 13 Jan 2021
+;Leo Laporte 13-17 Jan 2021
 
 #|==============================================================================
 
@@ -143,8 +143,6 @@ Let's see...
   (check-equal? (new-pairs "AB" "C")
                 (list "AC" "CB")))
 
-;; Now the meat
-    
 ;; Hash Hash -> Hash
 ;; Given a hash of insertion rules and a starting hash of the current pairs
 ;; produce a pairs hash with the new pairs created
