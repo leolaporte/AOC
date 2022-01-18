@@ -51,8 +51,8 @@ What is the lowest total risk of any path from the top left to the bottom right?
         (list->vector _)          ; convert the resulting list into a vector for easy addressing
         (grid width height _))))  ; make it a grid
 
-(define input-data (input->grid raw-input))
-(define test-data (input->grid raw-test))
+(define input-grid (input->grid raw-input))
+(define test-grid (input->grid raw-test))
 
 #|==============================================================================|#
 #|                                     NOTES                                    |#
@@ -107,10 +107,26 @@ function.
          (filter in-grid? _)          ; remove points that are off the grid
          (map (λ (x) (pos->point (car x) (cdr x) g)) _)))) ; convert (x . y) back to vector-ref
 
+(define (day15.1 g)
+  (let ([end (sub1 (vector-length (grid-points g)))])  
+    
+  (define (next-step p g risk max-risk visited)
+    (cond [(equal? p end) (set! max-risk risk) max-risk]
+          [(>= risk max-risk) risk]
+          [(not (false? (member p visited))) max-risk]
+          [else (set! risk (+ risk (vector-ref (grid-points g) p)))
+                (set! visited (cons p visited))
+                (next-steps (look-around p g) g risk max-risk visited)]))
 
+    (define (next-steps lop g risk max-risk visited)
+      (cond [(empty? lop) max-risk]
+            [else (min (next-step (first lop) g risk max-risk visited)
+                       (next-steps (rest lop) g risk max-risk visited))]))
+  
+  (next-step 0 g 0 (apply + (vector->list (grid-points g))) empty)))
 
-;(module+ test
-;  (check-equal? (day15.1 test-data) 40))
+(module+ test
+  (check-equal? (day15.1 test-grid) 40))
 
 ; (time (printf "2021 AOC Problem 15.1 = ~a\n" (day15.1 input)))
 
