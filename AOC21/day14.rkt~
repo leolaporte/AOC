@@ -24,7 +24,9 @@ of the most common element and subtract the quantity of the least common element
 
 ================================================================================|#
 
-(require rackunit) ; for tests
+(require rackunit
+         threading
+         racket/trace)
 
 #|==============================================================================|#
 #|                                      DATA                                    |#
@@ -66,8 +68,8 @@ that information in the pair counts. After I build the entire string I can
 use the pair counts to derive the elements. Each element appears in two positions:
 front and back of the pairs. So, if I count the number of times an element appears in
 all pairs and divide it by two that should be the total count for that element.
-But there's one more thing: the elements at each end of the string occur don't pair
-at one end so they'll be short by one. So, add one to those before dividing by two.
+But there's one more thing: the elements at each end of the string occur an extra
+time each (at each end) so add one to those before dividing by two.
 
 Let's see...
 |#
