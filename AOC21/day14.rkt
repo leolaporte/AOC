@@ -167,9 +167,8 @@ Let's see...
 
 ;; Hash -> (list-of Natural)
 ;; Given a pair-hash make a new list of the count for each element in the pair-hash
-;; since every letter appears in two pairs, divide each appearances of
-;; an element in the pair hash by 2 to get the actual element occurence,
-;; all but the end pairs for which we add 1 before dividing by 2
+;; this will give a list of doubled results so don't forget to divide the answer by 2
+;; every letter appears in two pairs except the end points - so add one to them
 (define (element-count pair-hash first last)
   (define raw-char-hash
     (for/fold ([ch (make-hash)]) 
@@ -178,18 +177,17 @@ Let's see...
         (hash-key+ ch c (hash-ref pair-hash pair)))
       (values ch)))
 
-  (for/list ([element (in-list (hash-keys raw-char-hash))])
-    (if (or (equal? element first) (equal? element last))
-        (/ (add1 (hash-ref raw-char-hash element)) 2)
-        (/ (hash-ref raw-char-hash element) 2))))
+  (hash-key+ raw-char-hash first 1)  ; fix the outer elements
+  (hash-key+ raw-char-hash last 1)   
+  (hash-values raw-char-hash))       ; list of DOUBLED values (divide by two later)
              
 (module+ test
   (check-equal? (element-count (make-pair-hash "NNCB") "N" "B")
-                '(1 1 2))
+                '(2 2 4))
   (check-equal? (element-count (make-pair-hash "NCNBCHB") "N" "B")
-                '(2 1 2 2))
+                '(4 2 4 4))
   (check-equal? (element-count (make-pair-hash "NBCCNBBBCBHCB") "N" "B")
-                '(4 1 6 2)))
+                '(8 2 12 4)))
   
 ;; String Hash Natural -> Natural
 ;; Given a polymer string and a hash of insertion rules produce the
@@ -205,7 +203,7 @@ Let's see...
 
          [counts (element-count final-pairs start-char end-char)]) ; produce list of element counts
          
-    (- (apply max counts) (apply min counts))))
+    (/ (- (apply max counts) (apply min counts)) 2)))  ; divide the final answer by 2 (cf. element-count)
         
 (module+ test
   (check-equal? (day14.1 test-polymer test-rules 1) 1)
