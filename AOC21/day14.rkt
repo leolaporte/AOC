@@ -201,9 +201,9 @@ Let's see...
   (let* ([start-char (substring polymer 0 1)]  ; keep track of first and last char in polymer string
          [end-char (substring polymer (sub1 (string-length polymer)) (string-length polymer))]
 
-         [final-pairs (for/fold ([pairs (make-pair-hash polymer)]) ; run insert-elements
-                                ([i (in-range iterations)])        ; iteration times
-                        (values (insert-element rules pairs)))]    ; to produce final polymer as hash of pairs
+         [final-pairs (for/fold ([pairs (make-pair-hash polymer)]) ; run insert-element...
+                                ([i (in-range iterations)])        ; ...iteration times...
+                        (values (insert-element rules pairs)))]    ; ...to produce final polymer as hash of pairs
 
          [counts (element-count final-pairs start-char end-char)]) ; produce list of element counts
          
@@ -229,8 +229,12 @@ of the most common element and subtract the quantity of the least common element
 
 (time (printf "2021 AOC Problem 14.2 = ~a\n" (day14.1 input-polymer input-rules 40)))
 
-; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
-; 2021 AOC Problem 14.1 = 3118
-; cpu time: 0 real time: 0 gc time: 0
-; 2021 AOC Problem 14.2 = 4332887448171
-; cpu time: 6 real time: 6 gc time: 2
+#|
+################################################################################
+Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+2021 AOC Problem 14.1 = 3118
+cpu time: 0 real time: 0 gc time: 0
+2021 AOC Problem 14.2 = 4332887448171
+cpu time: 2 real time: 2 gc time: 0
+################################################################################
+|#
