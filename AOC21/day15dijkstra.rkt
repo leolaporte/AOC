@@ -70,9 +70,13 @@ What is the lowest total risk of any path from the top left to the bottom right?
 #|==============================================================================|#
 #|
 
-A little examination of the sample data and optimum path shows that I can't
-simply select the lowest next point on the grid I will have to try all paths
-and save the risk from each. I can short-circuit any route by keeping track
+This is a classic path-finding problem. If you read "risk" as "distance" it's
+pretty clear what I'll need to do . A little examination of the sample data
+and optimum path shows that I can't simply select the lowest next point on the
+grid I will have to try all paths and save the risk from each. I can brute force
+ the sample data but it get's pretty big fast (as usual).
+
+So optimizations: I can short-circuit any route by keeping track
 of the lowest number I've found and stop a route if it gets higher. 
 
 A couple of other points, we don't count the risk of the starting point, and
@@ -88,12 +92,20 @@ OK this is really slow. I guess I've come up with the naive solution. But I noti
 that it's very fast if I start with a max-risk close to the actual answer. By
 short-circuiting guesses that are too big I can really speed things up. I've
 been using a simple max-risk generator (just a simple L-shaped path - which
-generates 60 in the test-grid) but I think I'll try my own version of Dijkstra:
-go all the way down using the lowest risk at each point, creating a good first
-guess. 
+generates 60 in the test-grid) but I think I'll try to grok and implement Dijkstra.
 
-I'll use binary heap from data/heap. It's an implmentation of a priority queue
-I'll use for 
+As I understand it, this algo spreads by starting at start, set distance to 0,
+examine the (up to) four surrounding nodes, if none of them are the end point,
+calculate the distance from start, and if it's lower than the node-dist replace
+ node-dist. Once you've completed that for all the surrounding points, remove
+start from the unvisited queue and pop the next point (the queue auto-sorts
+so that the next point is always the one with the lowest node-dist). Repeat.
+
+If Dijkstra isn't fast enough you can further optimize by adding a heuristic for
+choosing the next item in the queue - that's called A*. The heuristic for
+a grid like this is just "prefer down and to the right" - aka Manhattan. 
+
+I'll use Racket's binary heap from data/heap for my priority queue. 
 
 |#
 #|==============================================================================|#
@@ -138,49 +150,42 @@ I'll use for
          (map (λ (x) (pos->point (car x) (cdr x) g)) _)))) ; convert (x . y) back to vector-ref
 
 (define (make-unvisited-queue g)
-  "use info from grid g to build a heap filled with unvisited node structures"
   (define (node<=? x y)  ; sort by total distance from start (distance = risk)
     (< (node-dist x) (node-dist y)))
+
+  (make-heap node<=?))
   
-  (let ([h (make-heap node<=?)])
-    (for ([p (in-range (vector-length (grid-points g)))])
-      (heap-add! (node p (vector-ref (grid-points g) p) 9999 #f))))) ; infinite dist and unvisited
+;  (let ([h (make-heap node<=?)])
+;    (for ([p (in-range (vector-length (grid-points g)))])
+;      (heap-add! (node p (vector-ref (grid-points g) p) d))))
+;  h) 
    
 (define (day15.1 g)
   (define unvisited (make-unvisited-queue g))
   (define destination (sub1 (vector-length (grid-points g)))) ; destination: last point on grid
 
-  (for )
+;starting at start, set distance to 0,
+;examine the (up to) four surrounding nodes, if none of them are the end point,
+;calculate the distance from start, and if it's lower than the node-dist replace
+; node-dist. Once you've completed that for all the surrounding points, remove
+;start from the unvisited queue and pop the next point (the queue auto-sorts
+;so that the next point is always the one with the lowest node-dist). Repeat.
+;(struct node (point risk dist) #:transparent)
 
-; update estimates
-  let c = current point
-  for-each surrounding 0
-       p.lowest = c.current + p.risk
-         if (> (node-lowest p) 
+  (heap-add! unvisited (node 9999999 999 9999)) ; dummy "infinite" distance node
+  (heap-add! unvisited (node 0 1 0))  ; add start node with dist 0
+  
+  (do ([here (heap-min unvisited)])      ; get next point in queue
+      ((equal? (node-point here) destination) (node-point dist))  ; at destination? wrap it up!
 
+    (for ([next (in-list (surrounds (node-point here) g))])  ; look at the surrounding points
+      (let* ([next-risk (vector-ref (grid-points g) next)]
+            [dist (+ risk (node-risk here))])
+        (cond [(< dist (node-dist here))  ; better path
+      (heap-add! unvisited (node p risk (heap-min )) d)
+                                              
+  
 
-; visit next points
-               unexplored point with lowest dist
-  
-  (define (next-step p g risk max-risk seen)          ; check current point on grid
-    ;  (printf "Point: ~a - Risk: ~a - Max: ~a - Seen: ~a\n\n" p risk max-risk seen)
-    (cond [(equal? p end) (set! max-risk risk) risk]  ; end, make risk new max, return it
-          [(>= risk max-risk) risk]                   ; this path is worse - abandon
-          [(set-member? seen p) max-risk]             ; been here already - don't repeat
-          [else
-           (next-steps                            ; go on with next points on grid
-            (look-around p g)                     ; get next points sorted by risk
-            g                                     ; where are we again? oh yeah, grid
-            (+ risk (get-value p g))              ; keeping track of path's total risk
-            max-risk                              ; keep track of best path so far
-            (set-add seen p))]))                  ; adding this point to seen
-  
-  (define (next-steps lop g risk max-risk seen)
-    (cond [(empty? lop) max-risk]
-          [else (min (next-step (first lop) g risk max-risk seen)
-                     (next-steps (rest lop) g risk max-risk seen))]))
-  
-  (next-step 0 g 0 9999 (set)))
 
 (module+ test
   (check-equal? (day15.1 up-test-grid) 8)
