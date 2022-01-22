@@ -14,7 +14,7 @@ What is the lowest total risk of any path from the top left to the bottom right?
 (require rackunit
          threading
          racket/trace
-         racket/set) 
+         data/heap)  ; for binary heap 
 
 #|==============================================================================|#
 #|                                      DATA                                    |#
@@ -33,8 +33,10 @@ What is the lowest total risk of any path from the top left to the bottom right?
 1293138521
 2311944581")
 
+(define up-test "19999\n19111\n11191") ; to make sure I'm not only looking at down and right moves
+
 (struct grid (width height points) #:transparent)
-;; a grid is a structure
+;; Natural Natural (vector-of Natural)
 ;; where width and height are the dimensions of a rectangular grid
 ;; and points is a vector containing all the data points in
 ;; the structure
@@ -54,14 +56,20 @@ What is the lowest total risk of any path from the top left to the bottom right?
 
 (define input-grid (input->grid raw-input))
 (define test-grid (input->grid raw-test))
+(define up-test-grid (input->grid up-test))
 
 #|==============================================================================|#
 #|                                     NOTES                                    |#
 #|==============================================================================|#
 #|
-A little examination of the sample data and optimum path shows that I can't
-simply select the lowest next point on the grid I will have to try all paths
-and save the risk from each. I can short-circuit any route by keeping track
+
+This is a classic path-finding problem. If you read "risk" as "distance" it's
+pretty clear what I'll need to do . A little examination of the sample data
+and optimum path shows that I can't simply select the lowest next point on the
+grid I will have to try all paths and save the risk from each. I can brute force
+the sample data but it gets pretty big fast (as usual).
+
+So optimizations: I can short-circuit any route by keeping track
 of the lowest number I've found and stop a route if it gets higher. 
 
 A couple of other points, we don't count the risk of the starting point, and
@@ -72,6 +80,26 @@ As usual, I'll represent this 2D array as a vector using the Grid structure. Whi
 means I'll have to calculate the height and width of the grid, too. I'll also bring in
 my point->pos and pos->point functions and a modified version of my surrounding points
 function.
+
+OK this is really slow. I guess I've come up with the naive solution. But I notice
+that it's very fast if I start with a max-risk close to the actual answer. By
+short-circuiting guesses that are too big I can really speed things up. I've
+been using a simple max-risk generator (just a simple L-shaped path - which
+generates 60 in the test-grid) but I think I'll try to grok and implement Dijkstra.
+
+As I understand it, this algo spreads by starting at start, set distance to 0,
+examine the (up to) four surrounding nodes, if none of them are the end point,
+calculate the distance from start, and if it's lower than the node-dist replace
+ node-dist. Once you've completed that for all the surrounding points, remove
+start from the unvisited queue and pop the next point (the queue auto-sorts
+so that the next point is always the one with the lowest node-dist). Repeat.
+
+If Dijkstra isn't fast enough you can further optimize by adding a heuristic for
+choosing the next item in the queue - that's called A*. The heuristic for
+a grid like this is just "prefer down and to the right" - aka Manhattan. 
+
+I'll use Racket's binary heap from data/heap for my priority queue. 
+
 |#
 #|==============================================================================|#
 #|                                     CODE                                     |#
@@ -96,8 +124,8 @@ function.
 
 ;; Natural Grid -> (list-of Natural)
 ;; given a point on a grid structure, return a list of the 
-;; surrounding points - with lowest risk points first
-(define (look-around p g)
+;; surrounding points
+(define (surrounds p g)
   (let* ([pos (point->pos p g)]
          [x (car pos)]
          [y (cdr pos)]
@@ -109,54 +137,84 @@ function.
          [d (cons x (add1 y))])
     
     (define (in-grid? xy) (and (< -1 (car xy) width) (< -1 (cdr xy) height)))
-
-    (define (by-value x y)   ; sort surrounding points from lowest to highest risk
-      (< (get-value x g) (get-value y g)))
-    
-    (~>  (list u l r d)               ; the list of points as (x . y)
+   
+    (~>  (list d r l u)               ; the list of points as (x . y)
          (filter in-grid? _)          ; remove points that are off the grid
-         (map (λ (x) (pos->point (car x) (cdr x) g)) _) ; convert (x . y) back to vector-ref
-         (sort _ by-value))))         ; lowest risk points first
+         (map (λ (x) (pos->point (car x) (cdr x) g)) _)))) ; convert (x . y) back to vector-ref
 
-(define (get-max-risk g)
-  "get a reasonable starting point for the max-risk parameter - L-shaped route"
-  (define end (sub1 (vector-length (grid-points g))))
-  (define end-x (car (point->pos end g)))
-  (define end-y (cdr (point->pos end g)))
-  (define width (grid-width g))
+;; Set up a priority queue using Racket's data/heap
+;; adapted from ﻿Stelly, James. W.. Racket Programming the Fun Way (p. 193). No Starch Press.
+
+(define (risk<=? x y)  ; sort queue by risk
+  (<= (cdr x) (cdr y)))
+
+(define queue (make-heap risk<=?))
+
+(define (peek) (heap-min queue))  ; what's the next lowest-risk vertex?
+
+﻿(define (push n) (heap-add! queue n)) ; add a vertex to the queue
+
+(define (pop)   ; remove a vertex, returns the vertex
+  (let ([n (peek)])
+    (heap-remove-min! queue)
+    n))
+
+﻿(define (update-queue node new-risk)
+   (let ([old
+          (for/first ([item (in-heap queue)] ; find old item in queue
+                      #:when (equal? node (car item)))
+            item)])
+     (heap-remove! queue old)
+     (push (cons node new-risk))))
+
+(define (in-queue? n)
+  (for/or ([item (in-heap queue)])
+    (equal? n (car item))))
+
+﻿(define (queue->list) (for/list ([n (in-heap queue)]) n))
+
+;; OK now the Dijkstra
+
+;; Grid -> Natural
+;; Given a Grid, return the length of the shortest path from the
+;; first point to the last
+(define (day15.1 grid)
+
+  (define start 0)
+  (define end (sub1 (vector-length (grid-points grid))))
+  (define INFINITY 99999)
+
+  ; populate queue with infinite distances
+  (for ([i (in-range 1 (vector-length (grid-points grid)))]) ; leave out start
+    (push (cons i INFINITY)))
+
+  ; keep a parallel risk hash because we can't access risks in the queue
+  (define risks (make-hash))
+  (for ([p (in-range 1 (vector-length (grid-points grid)))]) ; also leave out start
+    (hash-set! risks p INFINITY))  ; risk starts infinite, but as nodes are visited
+  ; they're replaced with the lowest total risk to get there
   
-  (+ (for/sum ([y (in-range (add1 end-y))])
-       (get-value (pos->point 0 y g) g))
-
-     (for/sum ([x (in-range (add1 end-x))])
-       (get-value (pos->point x end-y g) g))))
+  (define (walk-path vertex risk)
     
-(define (day15.1 g)
-  (define end (sub1 (vector-length (grid-points g)))) ; destination: last point on grid
-  (define max-risk (get-max-risk g))      ; start with a reasonable max (L-shaped path)
-    
-  (define (next-step p g risk max-risk seen)          ; check current point on grid
-    (printf "Point: ~a - Risk: ~a - Max: ~a - Seen: ~a\n\n" p risk max-risk seen)
-    (cond [(equal? p end) (set! max-risk risk) risk]  ; end, make risk new max, return it
-          [(>= risk max-risk) risk]                   ; this path is worse - abandon
-          [(set-member? seen p) max-risk]             ; been here already - don't repeat
+    (cond [(equal? vertex end) risks]   ; all done, return total risk
+          
           [else
-               (next-steps                            ; go on with next points on grid
-                (look-around p g)                     ; get next points sorted by risk
-                g                                     ; where are we again? oh yeah, grid
-                (+ risk (get-value p g))              ; keeping track of path's total risk
-                max-risk                              ; keep track of best path so far
-                (set-add seen p))]))                  ; adding this point to seen
-  
-  (define (next-steps lop g risk max-risk seen)
-    (cond [(empty? lop) max-risk]
-          [else (min (next-step (first lop) g risk max-risk seen)
-                     (next-steps (rest lop) g risk max-risk seen))]))
-  
-  (next-step 0 g 0 max-risk (set empty)))
+           (for ([n (in-list (filter in-queue? (surrounds vertex grid)))]) ; process neighbors
+             (let* ([neighbor-risk (vector-ref (grid-points grid) n)]      ; from problem input
+                    [total-risk (+ risk neighbor-risk)]) ; current vertex + neighbor risk
+               (when (< total-risk (hash-ref risks n))   ; found a better route
+                 (hash-set! risks n total-risk)          ; replace old total with new better total
+                 (update-queue n total-risk))))          ; update the neighbor in the queue
+           ; we've done all the neighbors
+           (let ([new-vertex (pop)])                             ; so pop next vertex off the queue
+             (walk-path (car new-vertex) (cdr new-vertex)))]))   ; and repeat
+
+  (walk-path start 0))
 
 (module+ test
-  (time (check-equal? (day15.1 test-grid) 40)))
+  (check-equal? (day15.1 up-test-grid) 8)
+  (check-equal? (day15.1 test-grid) 40)
+  )
 
 ; (time (printf "2021 AOC Problem 15.1 = ~a\n" (day15.1 input-grid)))
 
