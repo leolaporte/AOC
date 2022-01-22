@@ -13,6 +13,7 @@ What is the lowest total risk of any path from the top left to the bottom right?
 
 (require rackunit
          threading
+         profile
          racket/trace
          data/heap)  ; for binary heap 
 
@@ -159,14 +160,6 @@ I'll use Racket's binary heap from data/heap for my priority queue.
     (heap-remove-min! queue)
     n))
 
-﻿(define (update-queue node new-risk)
-   (let ([old
-          (for/first ([item (in-heap queue)] ; find old item in queue
-                      #:when (equal? node (car item)))
-            item)])
-     (heap-remove! queue old)
-     (push (cons node new-risk))))
-
 (define (in-queue? n)
   (for/or ([item (in-heap queue)])
     (equal? n (car item))))
@@ -182,7 +175,7 @@ I'll use Racket's binary heap from data/heap for my priority queue.
 
   (define start 0)
   (define end (sub1 (vector-length (grid-points grid))))
-  (define INFINITY 99999)
+  (define INFINITY 9999)
 
   ; populate queue with infinite distances
   (for ([i (in-range 1 (vector-length (grid-points grid)))]) ; leave out start
@@ -190,13 +183,13 @@ I'll use Racket's binary heap from data/heap for my priority queue.
 
   ; keep a parallel risk hash because we can't access risks in the queue
   (define risks (make-hash))
-  (for ([p (in-range 1 (vector-length (grid-points grid)))]) ; also leave out start
+  (for ([p (in-range (vector-length (grid-points grid)))]) ; also leave out start
     (hash-set! risks p INFINITY))  ; risk starts infinite, but as nodes are visited
   ; they're replaced with the lowest total risk to get there
   
   (define (walk-path vertex risk)
     
-    (cond [(equal? vertex end) risks]   ; all done, return total risk
+    (cond [(equal? vertex end) risk]   ; all done, return total risk
           
           [else
            (for ([n (in-list (filter in-queue? (surrounds vertex grid)))]) ; process neighbors
@@ -204,7 +197,8 @@ I'll use Racket's binary heap from data/heap for my priority queue.
                     [total-risk (+ risk neighbor-risk)]) ; current vertex + neighbor risk
                (when (< total-risk (hash-ref risks n))   ; found a better route
                  (hash-set! risks n total-risk)          ; replace old total with new better total
-                 (update-queue n total-risk))))          ; update the neighbor in the queue
+                 (push (cons n total-risk)))))           ; update the neighbor in the queue
+
            ; we've done all the neighbors
            (let ([new-vertex (pop)])                             ; so pop next vertex off the queue
              (walk-path (car new-vertex) (cdr new-vertex)))]))   ; and repeat
@@ -213,17 +207,29 @@ I'll use Racket's binary heap from data/heap for my priority queue.
 
 (module+ test
   (check-equal? (day15.1 up-test-grid) 8)
-  (check-equal? (day15.1 test-grid) 40)
-  )
+  (check-equal? (day15.1 test-grid) 40))
 
-; (time (printf "2021 AOC Problem 15.1 = ~a\n" (day15.1 input-grid)))
+; (profile-thunk (thunk (day15.1 input-grid)))
+
+(time (printf "2021 AOC Problem 15.1 = ~a\n" (day15.1 input-grid)))
 
 #|=================================================================================
                                         PART 2
-                               
+
+The entire cave is actually five times larger in both dimensions than you thought;
+the area you originally scanned is just one tile in a 5x5 tile area that forms the
+full map. Your original map tile repeats to the right and downward; each time the
+tile repeats to the right or downward, all of its risk levels are 1 higher than the
+tile immediately up or left of it. However, risk levels above 9 wrap back around to 1.
+
+What is the lowest total risk of any path from the top left to the bottom right?
 
 ==================================================================================|#
 
+
+;(module+ test
+;  (check-equal? (day15.2 test2-grid) 315)
+;  )
 ; (time (printf "2021 AOC Problem 15.2 = ~a\n" (day15.1 input)))
 
 ; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
