@@ -15,7 +15,7 @@ What is the lowest total risk of any path from the top left to the bottom right?
          threading
          profile
          racket/trace
-         data/heap)  ; for binary heap 
+         data/heap)  ; for priority queue 
 
 #|==============================================================================|#
 #|                                      DATA                                    |#
@@ -23,18 +23,7 @@ What is the lowest total risk of any path from the top left to the bottom right?
 
 (define raw-input (file->string "input15.txt"))
 
-(define raw-test "1163751742
-1381373672
-2136511328
-3694931569
-7463417111
-1319128137
-1359912421
-3125421639
-1293138521
-2311944581")
-
-(define up-test "19999\n19111\n11191") ; to make sure I'm not only looking at down and right moves
+(define raw-test "1163751742\n1381373672\n2136511328\n3694931569\n7463417111\n1319128137\n1359912421\n3125421639\n1293138521\n2311944581")
 
 (struct grid (width height points) #:transparent)
 ;; Natural Natural (vector-of Natural)
@@ -57,7 +46,6 @@ What is the lowest total risk of any path from the top left to the bottom right?
 
 (define input-grid (input->grid raw-input))
 (define test-grid (input->grid raw-test))
-(define up-test-grid (input->grid up-test))
 
 #|==============================================================================|#
 #|                                     NOTES                                    |#
@@ -146,27 +134,18 @@ I'll use Racket's binary heap from data/heap for my priority queue.
 ;; Set up a priority queue using Racket's data/heap
 ;; adapted from ﻿Stelly, James. W.. Racket Programming the Fun Way (p. 193). No Starch Press.
 
-(define (risk<=? x y)  ; sort queue by risk
-  (<= (cdr x) (cdr y)))
+(define (peek q) (heap-min q))  ; what's the next lowest-risk vertex?
 
-(define queue (make-heap risk<=?))
+﻿(define (push q n) (heap-add! q n)) ; add a vertex to the queue
 
-(define (peek) (heap-min queue))  ; what's the next lowest-risk vertex?
-
-﻿(define (push n) (heap-add! queue n)) ; add a vertex to the queue
-
-(define (pop)   ; remove a vertex, returns the vertex
-  (let ([n (peek)])
-    (heap-remove-min! queue)
+(define (pop q)   ; remove a vertex, returns the vertex
+  (let ([n (peek q)])
+    (heap-remove-min! q)
     n))
 
-(define (in-queue? n)
-  (for/or ([item (in-heap queue)])
-    (equal? n (car item))))
+﻿(define (queue->list q) (for/list ([n (in-heap q)]) n))
 
-﻿(define (queue->list) (for/list ([n (in-heap queue)]) n))
-
-;; OK now the Dijkstra
+;; Doin' the Dijkstra
 
 ;; Grid -> Natural
 ;; Given a Grid, return the length of the shortest path from the
@@ -175,38 +154,46 @@ I'll use Racket's binary heap from data/heap for my priority queue.
 
   (define start 0)
   (define end (sub1 (vector-length (grid-points grid))))
-  (define INFINITY 9999)
 
-  ; populate queue with infinite distances
-  (for ([i (in-range 1 (vector-length (grid-points grid)))]) ; leave out start
-    (push (cons i INFINITY)))
-
-  ; keep a parallel risk hash because we can't access risks in the queue
+  ; create a priority queue for the analyzed nodes 
+  (define (risk<=? x y) (<= (cdr x) (cdr y)))
+  (define q (make-heap risk<=?))  ; auto-sort by risk
+;  (for ([i (in-range 1 (vector-length (grid-points grid)))]) ; leave out start
+;    (push q (cons i 9999)))
+ 
+  ; to speed this up I'm using two hashes to track total risk from start
+  ; to a node, and whether that node has been visited
   (define risks (make-hash))
-  (for ([p (in-range (vector-length (grid-points grid)))]) ; also leave out start
-    (hash-set! risks p INFINITY))  ; risk starts infinite, but as nodes are visited
-  ; they're replaced with the lowest total risk to get there
+  (define visited (make-hash))
+   
+  (for ([p (in-range (vector-length (grid-points grid)))]) 
+    (hash-set! risks p 9999)  ; risk starts infinite until actually calculated
+    (hash-set! visited p #f)) ; all nodes start unvisited
   
   (define (walk-path vertex risk)
     
     (cond [(equal? vertex end) risk]   ; all done, return total risk
           
           [else
-           (for ([n (in-list (filter in-queue? (surrounds vertex grid)))]) ; process neighbors
-             (let* ([neighbor-risk (vector-ref (grid-points grid) n)]      ; from problem input
-                    [total-risk (+ risk neighbor-risk)]) ; current vertex + neighbor risk
-               (when (< total-risk (hash-ref risks n))   ; found a better route
+          
+           (for ([n (in-list (filter
+                              (λ (x) (not (hash-ref visited x)))   ; if visited is false
+                              (surrounds vertex grid)))])          ; process neighbors
+             
+             (let* ([neighbor-risk (vector-ref (grid-points grid) n)]  ; base risk of neighbor vertex
+                    [total-risk (+ risk neighbor-risk)]) ; add base risk to source vertex risk
+               (when (< total-risk (hash-ref risks n))   ; found a better route?
                  (hash-set! risks n total-risk)          ; replace old total with new better total
-                 (push (cons n total-risk)))))           ; update the neighbor in the queue
+                 (push q (cons n total-risk)))))         ; update the node in the queue
 
            ; we've done all the neighbors
-           (let ([new-vertex (pop)])                             ; so pop next vertex off the queue
+           (let ([new-vertex (pop q)])       ; so pop next vertex off the queue (i.e. it's visited)
+             (hash-set! visited new-vertex #t)  ; we no longer need to consider it
              (walk-path (car new-vertex) (cdr new-vertex)))]))   ; and repeat
 
   (walk-path start 0))
 
 (module+ test
-  (check-equal? (day15.1 up-test-grid) 8)
   (check-equal? (day15.1 test-grid) 40))
 
 ; (profile-thunk (thunk (day15.1 input-grid)))
@@ -225,6 +212,7 @@ tile immediately up or left of it. However, risk levels above 9 wrap back around
 What is the lowest total risk of any path from the top left to the bottom right?
 
 ==================================================================================|#
+
 
 
 ;(module+ test
