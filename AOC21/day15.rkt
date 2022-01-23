@@ -87,7 +87,17 @@ If Dijkstra isn't fast enough you can further optimize by adding a heuristic for
 choosing the next item in the queue - that's called A*. The heuristic for
 a grid like this is just "prefer down and to the right" - aka Manhattan. 
 
-I'll use Racket's binary heap from data/heap for my priority queue. 
+I'll use Racket's binary heap from data/heap for my priority queue.
+
+Further optimizations took the first part from 160 seconds to 70 milliseconds.
+Turns out that most of the time spent was in searching the queue. So I minimized
+queue interactions. I only push and pop now. I created a hash for total risk
+and visited for quick searches. Also I don't bother ever deleting higher queue
+entries, just push on the new, lower entries. I can ignore the dupes. Further-
+more, unlike in a traditional Dijkstra I don't need to fill the queue with
+infinite distance (risk) nodes because I'm not trying to find all paths, I just
+need the lowest risk number. Saved a LOT of time. Now it's fast enough for the
+giant grid in part two. I think. 
 
 |#
 #|==============================================================================|#
@@ -131,20 +141,6 @@ I'll use Racket's binary heap from data/heap for my priority queue.
          (filter in-grid? _)          ; remove points that are off the grid
          (map (λ (x) (pos->point (car x) (cdr x) g)) _)))) ; convert (x . y) back to vector-ref
 
-;; Set up a priority queue using Racket's data/heap
-;; adapted from ﻿Stelly, James. W.. Racket Programming the Fun Way (p. 193). No Starch Press.
-
-(define (peek q) (heap-min q))  ; what's the next lowest-risk vertex?
-
-﻿(define (push q n) (heap-add! q n)) ; add a vertex to the queue
-
-(define (pop q)   ; remove a vertex, returns the vertex
-  (let ([n (peek q)])
-    (heap-remove-min! q)
-    n))
-
-﻿(define (queue->list q) (for/list ([n (in-heap q)]) n))
-
 ;; Doin' the Dijkstra
 
 ;; Grid -> Natural
@@ -158,14 +154,16 @@ I'll use Racket's binary heap from data/heap for my priority queue.
   ; create a priority queue for the analyzed nodes 
   (define (risk<=? x y) (<= (cdr x) (cdr y)))
   (define q (make-heap risk<=?))  ; auto-sort by risk
-;  (for ([i (in-range 1 (vector-length (grid-points grid)))]) ; leave out start
-;    (push q (cons i 9999)))
  
+  (define (pop q)   ; remove a vertex, returns the values 
+    (let ([n (heap-min q)])
+      (heap-remove-min! q)
+      n))
+  
   ; to speed this up I'm using two hashes to track total risk from start
   ; to a node, and whether that node has been visited
   (define risks (make-hash))
   (define visited (make-hash))
-   
   (for ([p (in-range (vector-length (grid-points grid)))]) 
     (hash-set! risks p 9999)  ; risk starts infinite until actually calculated
     (hash-set! visited p #f)) ; all nodes start unvisited
@@ -184,10 +182,10 @@ I'll use Racket's binary heap from data/heap for my priority queue.
                     [total-risk (+ risk neighbor-risk)]) ; add base risk to source vertex risk
                (when (< total-risk (hash-ref risks n))   ; found a better route?
                  (hash-set! risks n total-risk)          ; replace old total with new better total
-                 (push q (cons n total-risk)))))         ; update the node in the queue
+                 (heap-add! q (cons n total-risk)))))         ; update the node in the queue
 
            ; we've done all the neighbors
-           (let ([new-vertex (pop q)])       ; so pop next vertex off the queue (i.e. it's visited)
+           (let ([new-vertex (pop q)])          ; so pop next vertex off the queue 
              (hash-set! visited new-vertex #t)  ; we no longer need to consider it
              (walk-path (car new-vertex) (cdr new-vertex)))]))   ; and repeat
 
@@ -213,11 +211,51 @@ What is the lowest total risk of any path from the top left to the bottom right?
 
 ==================================================================================|#
 
+;; The only challenge here is to assemble the input data. I'll do this going across
+;; and down, copying the source info from the original grid and bumping it by a
+;; calculated amount. Oh but there's a challenge. Risk can only be 1-9 no zeros!
 
+(define (make-giant-grid g)
+  (define new-dim 5)
+  
+  (define width (* (grid-width g) new-dim))
+  (define height (* (grid-height g) new-dim))
+  (define big-vec (make-vector (* height width)))
+  (define big-grid (grid width height big-vec))
+  (define source (grid-points g))
 
-;(module+ test
-;  (check-equal? (day15.2 test2-grid) 315)
-;  )
-; (time (printf "2021 AOC Problem 15.2 = ~a\n" (day15.1 input)))
+  ; numbers are in range of 1-9 and 9 rolls over to 1
+  ; this is surprisingly tricky
+  (define (bump origin factor)
+   (let ([res (+ origin factor)])
+     (if (> res 9)
+         (add1 (modulo res 10))
+         res)))
 
-; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+;; we'll do this by row
+(for ([row (in-range 0 new-dim)])
+  (for ([y (in-range (* row (grid-height g))  (* (add1 row) (grid-height g)))])
+    (for ([x (in-range width)])
+      (let ([origin (vector-ref source (pos->point (remainder x (grid-width g))
+                                                   (remainder y (grid-height g)) g))]
+            [factor (+ row (quotient x (grid-width g)))])
+        (vector-set! big-vec (pos->point x y big-grid) (bump origin factor))))))
+  
+big-grid)
+
+(define (day15.2 g) (day15.1 (make-giant-grid g)))
+
+(module+ test
+  (check-equal? (day15.2 test-grid) 315))
+
+(time (printf "2021 AOC Problem 15.2 = ~a\n" (day15.2 input-grid)))
+
+#|
+Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+
+2021 AOC Problem 15.1 = 423
+cpu time: 64 real time: 70 gc time: 8
+2021 AOC Problem 15.2 = 2778
+cpu time: 2591 real time: 2581 gc time: 440
+
+|#
