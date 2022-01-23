@@ -1,7 +1,7 @@
 #lang racket
 
 ;AOC Day 15
-;Leo Laporte 17 Jan 2022
+;Leo Laporte 17-22 Jan 2022
 
 #|==============================================================================
 
@@ -227,21 +227,21 @@ What is the lowest total risk of any path from the top left to the bottom right?
   ; numbers are in range of 1-9 and 9 rolls over to 1
   ; this is surprisingly tricky
   (define (bump origin factor)
-   (let ([res (+ origin factor)])
-     (if (> res 9)
-         (add1 (modulo res 10))
-         res)))
+    (let ([res (+ origin factor)])
+      (if (> res 9)
+          (add1 (modulo res 10))
+          res)))
 
-;; we'll do this by row
-(for ([row (in-range 0 new-dim)])
-  (for ([y (in-range (* row (grid-height g))  (* (add1 row) (grid-height g)))])
-    (for ([x (in-range width)])
-      (let ([origin (vector-ref source (pos->point (remainder x (grid-width g))
-                                                   (remainder y (grid-height g)) g))]
-            [factor (+ row (quotient x (grid-width g)))])
-        (vector-set! big-vec (pos->point x y big-grid) (bump origin factor))))))
+  ;; we'll do this by row
+  (for ([row (in-range 0 new-dim)])
+    (for ([y (in-range (* row (grid-height g))  (* (add1 row) (grid-height g)))])
+      (for ([x (in-range width)])
+        (let ([origin (vector-ref source (pos->point (remainder x (grid-width g))
+                                                     (remainder y (grid-height g)) g))]
+              [factor (+ row (quotient x (grid-width g)))])
+          (vector-set! big-vec (pos->point x y big-grid) (bump origin factor))))))
   
-big-grid)
+  big-grid)
 
 (define (day15.2 g) (day15.1 (make-giant-grid g)))
 
@@ -254,8 +254,8 @@ big-grid)
 Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
 
 2021 AOC Problem 15.1 = 423
-cpu time: 64 real time: 70 gc time: 8
+cpu time: 65 real time: 77 gc time: 10
 2021 AOC Problem 15.2 = 2778
-cpu time: 2591 real time: 2581 gc time: 440
+cpu time: 2146 real time: 2333 gc time: 234
 
 |#
