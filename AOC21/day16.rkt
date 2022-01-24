@@ -58,7 +58,7 @@ Bits
                For operators, bit 6 is the length type (0 or 1)
                      0 means the next 15 bits are the length of the data
                      1 means the next 11 bits are the number of sub-packets to follow
-                     then the sub-packets using the literal rules*
+                                           restart with each sub-packet
 
 * Literal packets begin with a 1 until the last packet which begins with a 0 - so each
 literal packet is 5 bits
@@ -84,7 +84,54 @@ into expression structures I'll call xp.
 ;; xp is (xp Natural Natural Natural)
 ;; where version is a number from 0-7
 ;; op is a number from 0-7
-;; and data is a Natural 
+;; and data is a Natural
+
+(define (process-stream st)
+  (for/list ))
+
+;; Stream -> Xp
+;; Given a stream of bits render it an expression Xp
+(define (stream->xp stream)
+  (define version (bin->decimal (take 3 stream)))
+  (define op (bin->decimal (take 3 stream)))
+
+  (cond [(equal? op 4) (define data (get-literal stream))]
+        [else (if (equal? 0 (take 1 stream))
+                 (define data (get-data stream))
+                 (define data (xp-data (stream->xp stream))))])
+
+  ; dump padding to get to start of next expression
+
+  (xp version op data))
+
+(module+ test
+  (check-equal? (stream->xp '(110100101111111000101000)) (xp 6 4 2021))
+  (check-equal? (stream->xp '(00111000000000000110111101000101001010010001001000000000))
+                (xp 1 6 '(10 20)))
+  (check-equal? (stream->xp '(11101110000000001101010000001100100000100011000001100000))
+                (xp 7 3 '(1 2 3))))
+
+;; Natural Stream -> Natural
+;; Take count bits off stream and convert them into a number
+;; !!!
+(define (take cnt st) 0) ; stub
+
+;; Stream -> Natural
+;; given a stream use the literal rules to produce a number
+;; !!!
+(define (get-literal st) 0 ) ; stub
+
+;; Stream -> (list-of Natural)
+;; given a stream use the literal rules to produce a list
+;; of numbers
+;; !!!
+(define (get-data st) 0 ) ; stub
+
+;; Stream -> (list-of Natural)
+;; given a stream use the literal rules to produce a list
+;; of numbers
+;; !!!
+(define (get-sub-packets st) 0 ) ; stub
 
 ;; (list-of 1 or 0) -> natural
 ;; turn list of binary digits into its decimal equivalent, eg. '(1 0 1 0) into 10
@@ -94,9 +141,6 @@ into expression structures I'll call xp.
                   (else (string-append (number->string (first l)) (list->string (rest l))))))]
     (string->number (list->string lst) 2)))
 
-;; Stream -> (list-of xp)
-;; Given a stream of bits render it into a list of Xp
-(define (stream->xp stream) empty) ; stub
 
 
 (define (day16.1 l) 0) ; stub
