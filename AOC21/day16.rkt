@@ -22,36 +22,40 @@ get if you add up the version numbers in all packets?
 
 (require data/queue) ; for queue structure
 
+;; (list-of 1|0) -> Queue
+;; Given a list of 1 and 0 create a queue
+(define (list->queue lst)
+  (let ([q (make-queue)])
+    (for ([bit (in-list lst)])
+      (enqueue! q bit))
+    q))
+
+(module+ test
+  (check-equal? (queue->list (list->queue '(1 0 1 0))) '(1 0 1 0)))
+
 ;; String -> Queue
 (define (input->queue str)
   "takes input as a string of hex digits and turns it into a queue of bits"
-  (let ([q (make-queue)])
-    
-    (define (hex->bits hex)
-      (match hex
-        [#\0 '(0 0 0 0)] [#\1 '(0 0 0 1)] [#\2 '(0 0 1 0)] [#\3 '(0 0 1 1)]
-        [#\4 '(0 1 0 0)] [#\5 '(0 1 0 1)] [#\6 '(0 1 1 0)] [#\7 '(0 1 1 1)]
-        [#\8 '(1 0 0 0)] [#\9 '(1 0 0 1)] [#\A '(1 0 1 0)] [#\B '(1 0 1 1)]
-        [#\C '(1 1 0 0)] [#\D '(1 1 0 1)] [#\E '(1 1 1 0)] [#\F '(1 1 1 1)]
-        [#\newline '()]))
 
-    (define bit-list
-      (~> str
-          string->list
-          (map hex->bits _)
-          flatten))
+  (define (hex->bits hex)
+    (match hex
+      [#\0 '(0 0 0 0)] [#\1 '(0 0 0 1)] [#\2 '(0 0 1 0)] [#\3 '(0 0 1 1)]
+      [#\4 '(0 1 0 0)] [#\5 '(0 1 0 1)] [#\6 '(0 1 1 0)] [#\7 '(0 1 1 1)]
+      [#\8 '(1 0 0 0)] [#\9 '(1 0 0 1)] [#\A '(1 0 1 0)] [#\B '(1 0 1 1)]
+      [#\C '(1 1 0 0)] [#\D '(1 1 0 1)] [#\E '(1 1 1 0)] [#\F '(1 1 1 1)]
+      [#\newline '()]))
 
-    (for ([bit (in-list bit-list)])
-      (enqueue! q bit))
-
-    q))
+  (~> str
+      string->list
+      (map hex->bits _)
+      flatten
+      list->queue))
 
 (module+ test
   (check-equal? (queue->list (input->queue "F")) '(1 1 1 1))
   (check-equal? (queue->list (input->queue "DF")) '(1 1 0 1 1 1 1 1))
   (check-equal? (queue->list (input->queue "13")) '(0 0 0 1 0 0 1 1))
   )
-
 
 #|==============================================================================|#
 #|                                     NOTES                                    |#
@@ -84,10 +88,6 @@ the best way to solve part 1 is to create a function that takes the input as
 a stream of bits and turns it into a list of expressions. For part one
 I can just sum the version numbers of each item in the list.
 
-For efficiency I'll store the bits in a vector, and use a pointer to show
-my current position in the stream. So I can make an assembly line which assembles
-the bits into a list of expression structures.
-
 |#
 
 #|==============================================================================|#
@@ -103,11 +103,11 @@ the bits into a list of expression structures.
 ;; (queue-of 1 or 0) -> Xp
 ;;; Given a stream of bits render it an expression Xp
 (define (bits->xp q)
-  (let* ([version (take 3 q)]
-         [op (take 3 q)]
+  (let* ([version (pop-decimal 3 q)]
+         [op (pop-decimal 3 q)]
          [data
-          (cond [(equal? op 4) (get-literal q)]
-                [else (if (equal? 0 (take 1 q)) ; length type ID
+          (cond [(equal? op 4) (pop-decimal 1 q)]
+                [else (if (equal? 0 (pop-decimal 1 q)) ; length type ID
                           (get-data q)
                           (bits->xp q))])])
  
@@ -119,7 +119,6 @@ the bits into a list of expression structures.
   (check-equal? (bits->xp (input->queue "D2FE28")) (xp 6 4 2021))
   (check-equal? (bits->xp (input->queue "38006F45291200")) (xp 1 6 '((xp 6 4 10) (xp 2 4 20))))
   (check-equal? (bits->xp (input->queue "EE00D40C823060")) (xp 7 3 '((xp 2 4 1) (xp 4 4 2) (xp 1 4 3)))))
-  )
 
 ;; (list-of 1 or 0) -> natural
 ;; turn list of binary digits into its decimal equivalent, eg. '(1 0 1 0) into 10
@@ -130,29 +129,43 @@ the bits into a list of expression structures.
                   (else (string-append (number->string (first l)) (list->string (rest l))))))]
     (string->number (list->string lst) 2)))
 
-(module+ test
-  (check-equal? (bin-list->decimal '(1 0 1 0)) 10)
-  (check-equal? (bin-list->decimal '(1 1 1 1)) (+ 1 2 4 8))
-  (check-equal? (bin-list->decimal '(1 0 0 0)) 8))
-
-;; Natural Stream -> Natural
-;; Take count bits off stream and convert them into a number
-(define (take cnt q)
-  (bin->decimal
+;; Natural Stream -> (list-of 1s and 0s)
+;; Take count bits off stream and convert them into a list
+(define (pop cnt q)
    (for/list ([i (in-range cnt)])
-     (dequeue! q))))
+     (dequeue! q)))
 
 (module+ test
-  (check-equal? (take 3 (input->queue "D2FE28")) 6)
-  (check-equal? (take 3 (input->queue "38006F45291200")) 1)
-  (check-equal? (take 3 (input->queue "EE00D40C823060")) 7)
+  (check-equal? (pop 3 (input->queue "D2FE28")) '(1 1 0))
+  (check-equal? (pop 3 (input->queue "38006F45291200")) '(0 0 1))
+  (check-equal? (pop 3 (input->queue "EE00D40C823060")) '(1 1 1))
+  )
+
+;; Natural Queue -> Natural
+;; given a count and a queue, dequeue count bits and return as a
+;; decimal number
+(define (pop-decimal cnt q)
+  (bin->decimal (pop cnt q)))
+
+(module+ test
+  (check-equal? (pop-decimal 3 (input->queue "D2FE28")) 6)
+  (check-equal? (pop-decimal 3 (input->queue "38006F45291200")) 1)
+  (check-equal? (pop-decimal 3 (input->queue "EE00D40C823060")) 7)
   )
 
 ;; Stream -> Natural
 ;; given a stream use the literal rules to produce a number
-;; !!!
-(define (get-literal q) 0 ) ; stub
+(define (get-literal q)
+  (bin->decimal
+   (flatten
+    (for/list ([i (in-naturals)]
+               #:when (= (pop-decimal 1 q) 1))
+      #:final (pop 3 q)
+     (pop 3 q)))))
 
+(module+ test
+  (check-equal? (get-literal (list->queue '(1 0 1 1 1 1 1 1 1 0 0 0 1 0 1))) 2021))
+    
 ;; Stream -> (list-of Natural)
 ;; given a stream use the literal rules to produce a list
 ;; of numbers
