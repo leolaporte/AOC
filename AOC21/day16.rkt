@@ -54,8 +54,7 @@ get if you add up the version numbers in all packets?
 (module+ test
   (check-equal? (queue->list (input->queue "F")) '(1 1 1 1))
   (check-equal? (queue->list (input->queue "DF")) '(1 1 0 1 1 1 1 1))
-  (check-equal? (queue->list (input->queue "13")) '(0 0 0 1 0 0 1 1))
-  )
+  (check-equal? (queue->list (input->queue "13")) '(0 0 0 1 0 0 1 1)))
 
 #|==============================================================================|#
 #|                                     NOTES                                    |#
@@ -94,31 +93,31 @@ I can just sum the version numbers of each item in the list.
 #|                                     CODE                                     |#
 #|==============================================================================|#
 
-(struct xp (version op data) #:transparent)
-;; xp is (xp Natural Natural Natural)
+(struct packet (version op data) #:transparent)
+;; packet is (packet Natural Natural Natural)
 ;; where version is a number from 0-7
 ;; op is a number from 0-7
-;; and data is a Natural or (list-of xp)
+;; and data is a Natural or (list-of packet)
 
-;; (queue-of 1 or 0) -> Xp
-;;; Given a stream of bits render it an expression Xp
-(define (bits->xp q)
-  (let* ([version (pop-decimal 3 q)]
-         [op (pop-decimal 3 q)]
+;; (queue-of 1 or 0) -> Packet
+;;; Given a stream of bits build a Packet
+(define (bits->packet q)
+  (let* ([version (pop->decimal 3 q)]
+         [op (pop->decimal 3 q)]
          [data
-          (cond [(equal? op 4) (pop-decimal 1 q)]
-                [else (if (equal? 0 (pop-decimal 1 q)) ; length type ID
-                          (get-data q)
-                          (bits->xp q))])])
- 
-    ; dump padding to get to start of next expression
+          (cond [(equal? op 4) (get-literal q)]
+                [else (get-subpackets q)])])
 
-    (xp version op data)))
+    (packet version op data)))
 
 (module+ test
-  (check-equal? (bits->xp (input->queue "D2FE28")) (xp 6 4 2021))
-  (check-equal? (bits->xp (input->queue "38006F45291200")) (xp 1 6 '((xp 6 4 10) (xp 2 4 20))))
-  (check-equal? (bits->xp (input->queue "EE00D40C823060")) (xp 7 3 '((xp 2 4 1) (xp 4 4 2) (xp 1 4 3)))))
+  (check-equal? (bits->packet (input->queue "D2FE28")) (packet 6 4 2021))
+  
+  (check-equal? (bits->packet (input->queue "38006F45291200"))
+                (packet 1 6 '((packet 6 4 10) (packet 2 4 20))))
+  
+  (check-equal? (bits->packet (input->queue "EE00D40C823060"))
+                (packet 7 3 '((packet 2 4 1) (packet 4 4 2) (packet 1 4 3)))))
 
 ;; (list-of 1 or 0) -> natural
 ;; turn list of binary digits into its decimal equivalent, eg. '(1 0 1 0) into 10
@@ -132,45 +131,58 @@ I can just sum the version numbers of each item in the list.
 ;; Natural Stream -> (list-of 1s and 0s)
 ;; Take count bits off stream and convert them into a list
 (define (pop cnt q)
-   (for/list ([i (in-range cnt)])
-     (dequeue! q)))
+  (for/list ([i (in-range cnt)])
+    (dequeue! q)))
 
 (module+ test
   (check-equal? (pop 3 (input->queue "D2FE28")) '(1 1 0))
   (check-equal? (pop 3 (input->queue "38006F45291200")) '(0 0 1))
-  (check-equal? (pop 3 (input->queue "EE00D40C823060")) '(1 1 1))
-  )
+  (check-equal? (pop 3 (input->queue "EE00D40C823060")) '(1 1 1)))
 
 ;; Natural Queue -> Natural
 ;; given a count and a queue, dequeue count bits and return as a
 ;; decimal number
-(define (pop-decimal cnt q)
+(define (pop->decimal cnt q)
   (bin->decimal (pop cnt q)))
 
 (module+ test
-  (check-equal? (pop-decimal 3 (input->queue "D2FE28")) 6)
-  (check-equal? (pop-decimal 3 (input->queue "38006F45291200")) 1)
-  (check-equal? (pop-decimal 3 (input->queue "EE00D40C823060")) 7)
-  )
+  (check-equal? (pop->decimal 3 (input->queue "D2FE28")) 6)
+  (check-equal? (pop->decimal 3 (input->queue "38006F45291200")) 1)
+  (check-equal? (pop->decimal 3 (input->queue "EE00D40C823060")) 7))
 
 ;; Stream -> Natural
 ;; given a stream use the literal rules to produce a number
 (define (get-literal q)
-  (bin->decimal
-   (flatten
-    (for/list ([i (in-naturals)]
-               #:when (= (pop-decimal 1 q) 1))
-      #:final (pop 3 q)
-     (pop 3 q)))))
-
+  (define (get-bits q)
+    (let ([b (pop 5 q)])                             ; 5 bits at a time
+      (cond [(= (first b) 0) (rest b)]               ; if first bit is 0 this is the last group
+            [else (append (rest b) (get-bits q))]))) ; otherwise keep fetching bits
+  (bin->decimal (get-bits q)))                       ; convert resulting list of bits to decimal
+  
 (module+ test
   (check-equal? (get-literal (list->queue '(1 0 1 1 1 1 1 1 1 0 0 0 1 0 1))) 2021))
-    
+
+#|
+
+"An operator packet contains one or more packets. To indicate which subsequent binary data represents
+its sub-packets, an operator packet can use one of two modes indicated by the bit immediately after
+the packet header; this is called the length type ID:
+
+    If the length type ID is 0, then the next 15 bits are a number that represents the total length
+in bits of the sub-packets contained by this packet.
+
+    If the length type ID is 1, then the next 11 bits are a number that represents the number of
+sub-packets immediately contained by this packet.
+
+Finally, after the length type ID bit and the 15-bit or 11-bit field, the sub-packets appear."
+
+|#
+
 ;; Stream -> (list-of Natural)
-;; given a stream use the literal rules to produce a list
-;; of numbers
+;; Given a stream produce the remaining sub-packets
+;; (follow-up to the initial packet processing)
 ;; !!!
-(define (get-data q) 0 ) ; stub
+(define (get-subpackets q) 0 ) ; stub
 
 
 #|
@@ -194,7 +206,7 @@ I can just sum the version numbers of each item in the list.
 (module+ test
   (check-equal? (day16.2 test-data) 0))
 
- (time (printf "2021 AOC Problem 16.2 = ~a\n" (day16.2 input)))
+ (time (printf "2021 AOC Problem 16.2 = ~a\n" (day16.2 (file->string "input16.txt"))))
 |#
 
 #|
