@@ -96,10 +96,10 @@ I can just sum the version numbers of each Packet in the tree.
 |#
 
 (struct packet (version operator operand) #:transparent)
-;; packet is (packet Natural Natural (one-of Natural or (list-of Packet))
+;; packet is (packet Natural Natural (one-of Packet or (list-of Packet))
 ;; where version is a number from 0-7
 ;; operator is a number from 0-7
-;; and operand is one of Natural or (list-of Packet)
+;; and operand is one of Packet or (list-of Packet)
 
 #|==============================================================================|#
 #|                                  UTILITIES                                   |#
@@ -234,22 +234,97 @@ I can just sum the version numbers of each Packet in the tree.
   (check-equal? (day16.1  "A0016C880162017C3686B18A3D4780") 31))
 
 (time (printf "2021 AOC Problem 16.1 = ~a\n"
- (day16.1 (file->string "input16.txt"))))
-
-
+              (day16.1 (file->string "input16.txt"))))
 
 #|=================================================================================
                                         PART 2
-                               
+
+[After replacing operand values with the operators] What do you get if you
+evaluate the expression represented by your hexadecimal-encoded BITS transmission?
 
 ==================================================================================|#
 
 #|
-(module+ test
-  (check-equal? (day16.2 test-data) 0))
+Notes: all the hard work is done. I've actually built a complex expression
+tree. If I replace all the operator numbers with actual operations and the
+literal packets with literals (we no longer need the version number) the
+Racket reader should actually process it as is. I think. Nope. Gonna
+have to make my own reader: eval(). I will also want to replace bits->packet
+with bits->exp for simpler evaluation.
 
- (time (printf "2021 AOC Problem 16.2 = ~a\n" (day16.2 (input->queue "input16.txt"))))
+Simple expressions can be evaluated given an Exp e: (apply (exp-operator e) (exp-operand e))
+Complex epxressions can be evaluated recursively from right to left.
 |#
+
+(struct exp (operator operand) #:transparent)
+;; Interp. (exp Symbol (one-of Natural or (list-of exp))
+;; Exp is an operator, one of + * min man > < =
+;; and an operand, one of Natural or (list-of Exp)
+
+(define (val->op digit)
+  (match digit
+    [0 +] [1 *] [2 min] [3 max] [4 'val] [5 >] [6 <] [7 =]))
+
+;; Queue -> Exp
+;; Given a queue of bits build an expression
+(define (bits->exp q)
+  (let* ([version (pop->decimal 3 q)]                              ; the version number (discard)
+         [operator (val->op (pop->decimal 3 q))])                  ; the operator
+    
+         (if (equal? operator 'val)
+             (get-literal q)                  ; just return the value
+             (exp operator (get-subs q)))))   ; else return an Exp
+
+(module+ test
+  (check-equal? (bits->exp (input->queue "C200B40A82")) (exp + '(1 2))))
+
+;; Queue -> (list-of Exp)
+;; Given a queue produce the operands as a list of Exp
+(define (get-subs q)
+  
+  (define (get-len-subs len q)
+    "make new queue of len, then process it"
+    (let ([new-queue (list->queue (pop len q))]) ; here's where the padding gets ignored
+
+      (define (subs q)
+        (cond [(queue-empty? q) empty]
+              [else (cons (bits->exp q) (subs q))]))
+      
+      (subs new-queue)))
+
+  (define (get-num-subs num q)
+    "process num many packets"
+    (for/list ([i (in-range num)])                
+      (bits->exp q)))
+             
+  (if (= (pop->decimal 1 q) 0)               ; get length type 
+      (get-len-subs (pop->decimal 15 q) q)   ; get sub-packets by length
+      (get-num-subs (pop->decimal 11 q) q))) ; get sub-packets by number
+
+;; Exp -> Natural
+;; given an expression evaluate it to produce a Natural result
+(define (eval e)
+  (apply (exp-operator e) (exp-operand e)))
+
+
+(define (day16.2 input)
+  (~> input              ; given a string of hex digits
+      input->queue       ; turn into a queue of bits
+      bits->exp          ; turn bits into an expression
+      eval))             ; evaluate the expression
+
+(module+ test
+  (check-equal? (day16.2 "C200B40A82") 3) ; (apply (exp-operator (bits->exp (input->queue "C200B40A82"))) (exp-operand (bits->exp (input->queue "C200B40A82"))))
+  (check-equal? (day16.2 "04005AC33890") 54)
+  (check-equal? (day16.2 "880086C3E88112") 7)
+  (check-equal? (day16.2 "CE00C43D881120") 9)
+  (check-equal? (day16.2 "D8005AC2A8F0") 15)
+  (check-equal? (day16.2 "F600BC2D8F") 15)
+  (check-equal? (day16.2 "9C005AC2F8F0") 15)
+  (check-equal? (day16.2 "9C0141080250320F1802104A08") 1))
+
+; (time (printf "2021 AOC Problem 16.2 = ~a\n" (day16.2 (input->queue "input16.txt"))))
+
 
 #|
 Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
