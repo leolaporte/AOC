@@ -212,42 +212,29 @@ I can just sum the version numbers of each Packet in the tree.
 ;; Packet -> Natural
 ;; Given a tree of Packet, return the sum of all the version fields in the tree
 (define (sum-versions p)
+  (cond [(empty? p) 0]
+        [(and (packet? p) (not (list? (packet-operand p)))) (packet-version p)] ; a leaf node
+        [(list? p) (+ (sum-versions (first p)) (sum-versions (rest p)))]        
+        [else (+ (packet-version p)
+                 (sum-versions (first (packet-operand p)))
+                 (sum-versions (rest (packet-operand p))))]))
 
-  ; a couple of utility functions
-  (define (atom? x)
-    (and (not (null? x))
-         (not (pair? x))))
-
-  (define (leaf? x)
-    (and (packet? x) (atom? (packet-operand x))))
-
-  ;; now begin the CAR/CDR recusion through the tree
-  (define (sum p)
-    (cond  [(leaf? p) (packet-version p)]
-           [else (sums (packet-operand p))]))
-
-  (define (sums lop)
-    (cond [(empty? lop) 0]
-          [else (+ (sum (first lop))
-                   (sums (rest lop)))]))
-  (trace sum sums)
-  (sum p))
-
+; (trace sum-versions)
+ 
 (define (day16.1 input)
   (~> input              ; given a string of hex digits
       input->queue       ; turn into a queue of bits
-      bits->packet       ; turn bits into packets
+      bits->packet       ; turn bits into packet tree
       sum-versions))     ; return the sum of the packet version numbers
 
 (module+ test
   (check-equal? (day16.1 "8A004A801A8002F478") 16)
-  ;(check-equal? (day16.1 "620080001611562C8802118E34") 12)
-  ;(check-equal? (day16.1 "C0015000016115A2E0802F182340") 23)
-  ;(check-equal? (day16.1  "A0016C880162017C3686B18A3D4780") 31)
-  )
+  (check-equal? (day16.1 "620080001611562C8802118E34") 12)
+  (check-equal? (day16.1 "C0015000016115A2E0802F182340") 23)
+  (check-equal? (day16.1  "A0016C880162017C3686B18A3D4780") 31))
 
-;(time (printf "2021 AOC Problem 16.1 = ~a\n"
-; (day16.1 (file->string "input16.txt"))))
+(time (printf "2021 AOC Problem 16.1 = ~a\n"
+ (day16.1 (file->string "input16.txt"))))
 
 
 
