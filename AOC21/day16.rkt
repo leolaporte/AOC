@@ -245,89 +245,65 @@ evaluate the expression represented by your hexadecimal-encoded BITS transmissio
 ==================================================================================|#
 
 #|
-Notes: all the hard work is done. I've actually built a complex expression
+Notes: all the hard work is done. (Hah!) I've actually built a complex expression
 tree. If I replace all the operator numbers with actual operations and the
 literal packets with literals (we no longer need the version number) the
-Racket reader should actually process it as is. I think. Nope. Gonna
-have to make my own reader: eval(). I will also want to replace bits->packet
-with bits->exp for simpler evaluation.
-
-Simple expressions can be evaluated given an Exp e: (apply (exp-operator e) (exp-operand e))
-Complex epxressions can be evaluated recursively from right to left.
+Racket reader should actually process it as is. (Ha ha!) I think. Nope. Gonna
+have to make my own reader: eval(). 
 |#
 
-(struct exp (operator operand) #:transparent)
-;; Interp. (exp Symbol (one-of Natural or (list-of exp))
-;; Exp is an operator, one of + * min man > < =
-;; and an operand, one of Natural or (list-of Exp)
+;; This following is cribbed in its entirety from BogdanP - much more elegant
+;; than my solution. Clearer, too. 
+;; https://github.com/Bogdanp/aoc2021/blob/master/day16.rkt
 
-(define (val->op digit)
-  (match digit
-    [0 +] [1 *] [2 min] [3 max] [4 'val] [5 >] [6 <] [7 =]))
-
-;; Queue -> Exp
-;; Given a queue of bits build an expression
-(define (bits->exp q)
-  (let* ([version (pop->decimal 3 q)]                              ; the version number (discard)
-         [operator (val->op (pop->decimal 3 q))])                  ; the operator
-    
-         (if (equal? operator 'val)
-             (get-literal q)                  ; just return the value
-             (exp operator (get-subs q)))))   ; else return an Exp
+(define (eval p)
+  "parse packets: ignore version, apply operator, recursively decode subpackets"
+  (match p
+    [(packet _ 0 subpacket) (apply + (map eval subpacket))]
+    [(packet _ 1 subpacket) (apply * (map eval subpacket))]
+    [(packet _ 2 subpacket) (apply min (map eval subpacket))]
+    [(packet _ 3 subpacket) (apply max (map eval subpacket))]
+    [(packet _ 4 val) val]  ; no operation, just a literal
+    [(packet _ 5 subpacket) (if (> (eval (car subpacket)) (eval (cadr subpacket))) 1 0)]
+    [(packet _ 6 subpacket) (if (< (eval (car subpacket)) (eval (cadr subpacket))) 1 0)]
+    [(packet _ 7 subpacket) (if (= (eval (car subpacket)) (eval (cadr subpacket))) 1 0)]))
 
 (module+ test
-  (check-equal? (bits->exp (input->queue "C200B40A82")) (exp + '(1 2))))
-
-;; Queue -> (list-of Exp)
-;; Given a queue produce the operands as a list of Exp
-(define (get-subs q)
-  
-  (define (get-len-subs len q)
-    "make new queue of len, then process it"
-    (let ([new-queue (list->queue (pop len q))]) ; here's where the padding gets ignored
-
-      (define (subs q)
-        (cond [(queue-empty? q) empty]
-              [else (cons (bits->exp q) (subs q))]))
-      
-      (subs new-queue)))
-
-  (define (get-num-subs num q)
-    "process num many packets"
-    (for/list ([i (in-range num)])                
-      (bits->exp q)))
-             
-  (if (= (pop->decimal 1 q) 0)               ; get length type 
-      (get-len-subs (pop->decimal 15 q) q)   ; get sub-packets by length
-      (get-num-subs (pop->decimal 11 q) q))) ; get sub-packets by number
-
-;; Exp -> Natural
-;; given an expression evaluate it to produce a Natural result
-(define (eval e)
-  (apply (exp-operator e) (exp-operand e)))
-
+  (check-equal? (eval (packet 1 0 (list (packet 1 4 1) (packet 1 4 2)))) 3)
+  (check-equal? (eval (packet 1 1 (list (packet 1 4 1) (packet 1 4 2)))) 2)
+  (check-equal? (eval (packet 1 2 (list (packet 1 4 1) (packet 1 4 2) (packet 1 4 3) (packet 1 4 4)))) 1)
+  (check-equal? (eval (packet 1 3 (list (packet 1 4 1) (packet 1 4 2) (packet 1 4 3) (packet 1 4 4)))) 4)
+  (check-equal? (eval (packet 1 4 2)) 2)
+  (check-equal? (eval (packet 1 5 (list (packet 1 4 1) (packet 1 4 2)))) 0) 
+  (check-equal? (eval (packet 1 6 (list (packet 1 4 1) (packet 1 4 2)))) 1)
+  (check-equal? (eval (packet 1 7 (list (packet 1 4 2) (packet 1 4 2)))) 1))
 
 (define (day16.2 input)
   (~> input              ; given a string of hex digits
       input->queue       ; turn into a queue of bits
-      bits->exp          ; turn bits into an expression
-      eval))             ; evaluate the expression
+      bits->packet       ; turn bits into packets
+      list               ; BogdanP's eval wants a list for the map below
+      (map eval _)       ; evaluate the packets (turns out they're expressions!)
+      (apply + _)))      ; sum the result
 
 (module+ test
-  (check-equal? (day16.2 "C200B40A82") 3) ; (apply (exp-operator (bits->exp (input->queue "C200B40A82"))) (exp-operand (bits->exp (input->queue "C200B40A82"))))
+  (check-equal? (day16.2 "C200B40A82") 3)
   (check-equal? (day16.2 "04005AC33890") 54)
   (check-equal? (day16.2 "880086C3E88112") 7)
   (check-equal? (day16.2 "CE00C43D881120") 9)
-  (check-equal? (day16.2 "D8005AC2A8F0") 15)
-  (check-equal? (day16.2 "F600BC2D8F") 15)
-  (check-equal? (day16.2 "9C005AC2F8F0") 15)
+  (check-equal? (day16.2 "D8005AC2A8F0") 1)
+  (check-equal? (day16.2 "F600BC2D8F") 0)
+  (check-equal? (day16.2 "9C005AC2F8F0") 0)
   (check-equal? (day16.2 "9C0141080250320F1802104A08") 1))
 
-; (time (printf "2021 AOC Problem 16.2 = ~a\n" (day16.2 (input->queue "input16.txt"))))
-
+(time (printf "2021 AOC Problem 16.2 = ~a\n" (day16.2 (file->string "input16.txt"))))
 
 #|
 Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
 
+2021 AOC Problem 16.1 = 989
+cpu time: 6 real time: 6 gc time: 3
+2021 AOC Problem 16.2 = 7936430475134
+cpu time: 2 real time: 2 gc time: 0
 
 |#
