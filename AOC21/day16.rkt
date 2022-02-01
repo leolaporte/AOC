@@ -99,7 +99,9 @@ I can just sum the version numbers of each Packet in the tree.
 ;; packet is (packet Natural Natural (one-of Packet or (list-of Packet))
 ;; where version is a number from 0-7
 ;; operator is a number from 0-7
-;; and operand is one of Packet or (list-of Packet)
+;; and operand is one of:
+;; Packet
+;; (list-of Packet)
 
 #|==============================================================================|#
 #|                                  UTILITIES                                   |#
@@ -234,8 +236,8 @@ I can just sum the version numbers of each Packet in the tree.
 #|=================================================================================
                                         PART 2
 
-[After replacing operand values with the operators] What do you get if you
-evaluate the expression represented by your hexadecimal-encoded BITS transmission?
+What do you get if you evaluate the expression represented by your
+hexadecimal-encoded BITS transmission?
 
 ==================================================================================|#
 
@@ -253,7 +255,7 @@ have to make my own reader: eval().
 
 (define (eval p)
   "parse packets: ignore version, apply operator, recursively decode subpackets"
-  (match p
+  (match p  ; underscored items are ignored - _ is a wildcard
     [(packet _ 0 subpacket) (apply + (map eval subpacket))]
     [(packet _ 1 subpacket) (apply * (map eval subpacket))]
     [(packet _ 2 subpacket) (apply min (map eval subpacket))]

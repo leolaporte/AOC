@@ -37,15 +37,48 @@ highest y position it reaches on this trajectory?
 
 (define TARGET '(248 285 85 -56))
 
-
 #|==============================================================================|#
 #|                                     NOTES                                    |#
 #|==============================================================================|#
 
 #|
+First instinct is to brute force it. Let's see how fast that is.
 
+I'll need an object, probe, to record the current state of the probe.
+
+I'll need a function, step, that advances the probe one step.
+
+I'll need a function, flight, that repeats until probe enters target or passes out of reach.
+
+I'll need a boolean, hit-target?, that tells us whether the probe has hit the target
+
+I'll need a boolean, in-range? that tells us whether the probe is out of range (stop IOW)
+
+I'll need a hash, hits, with starting velocity as the key and max-y as the value.
+
+So then. Starting at 0,0 try velocities and record those which hit the target. When
+we've tried all the velocities find the hash key with the biggest y-value.
+
+Only one more question: what range of velocities should I try? I don't want to
+search an infinite set. Ah this is what makes it not entirely brute force. Can I
+reason out what the ranges of x-v and y-v can be?
+
+x-v has to be > 1 or we go straight up or down. Or both.
+x-y has to be high enough 
+y-v has to be high enough to overcome gravity 
 
 |#
+
+(struct probe (x y xv yv)) ; contains the current state of the probe
+(define hits (make-hash))  ; contains the max-y of all successful launches
+
+(define (step probe) (probe 0 0 0 0)) ; advances the probe one step according to the rules
+
+(define (flight probe velocity) #f) ; tests all the velocites, returns #t if we hit
+
+(define (hit-target? probe) #f) ; have we hit target?
+
+(define (in-range? probe) #f) ; are we still in range? (is it still possible to hit?)
 
 #|==============================================================================|#
 #|                                     CODE                                     |#
