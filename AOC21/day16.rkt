@@ -212,14 +212,9 @@ I can just sum the version numbers of each Packet in the tree.
 ;; Packet -> Natural
 ;; Given a tree of Packet, return the sum of all the version fields in the tree
 (define (sum-versions p)
-  (cond [(empty? p) 0]
-        [(and (packet? p) (not (list? (packet-operand p)))) (packet-version p)] ; a leaf node
-        [(list? p) (+ (sum-versions (first p)) (sum-versions (rest p)))]        
-        [else (+ (packet-version p)
-                 (sum-versions (first (packet-operand p)))
-                 (sum-versions (rest (packet-operand p))))]))
-
-; (trace sum-versions)
+  (match p
+    [(packet version 4 ps) version]  ; literals are a little different
+    [(packet version _ ps) (apply + version (map sum-versions ps))]))
  
 (define (day16.1 input)
   (~> input              ; given a string of hex digits
