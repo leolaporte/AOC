@@ -32,10 +32,13 @@ highest y position it reaches on this trajectory?
 #|==============================================================================|#
 
 ; Data is pretty simple...
-; target area: x=248..285, y=-85..-56
-; You'll forgive me if I don't write a parser for this.
+; "target area: x=248..285, y=-85..-56"
 
-(define TARGET '(248 285 85 -56))
+;; String -> (list-of Number)
+;; given the problem provided coordinate string, return a list of values
+;; defining a target rectangle containing four points:
+;; (top-left, top-right, bottom-left, bottom-right)
+(define (target str) (map string->number (regexp-match* #px"(\\d+)" str)))
 
 #|==============================================================================|#
 #|                                     NOTES                                    |#
@@ -44,50 +47,84 @@ highest y position it reaches on this trajectory?
 #|
 First instinct is to brute force it. Let's see how fast that is.
 
-I'll need an object, probe, to record the current state of the probe.
-
-I'll need a function, step, that advances the probe one step.
-
-I'll need a function, flight, that repeats until probe enters target or passes out of reach.
-
-I'll need a boolean, hit-target?, that tells us whether the probe has hit the target
-
-I'll need a boolean, in-range? that tells us whether the probe is out of range (stop IOW)
-
-I'll need a hash, hits, with starting velocity as the key and max-y as the value.
-
-So then. Starting at 0,0 try velocities and record those which hit the target. When
-we've tried all the velocities find the hash key with the biggest y-value.
+- I'll need an object, probe, to record the current state of the probe.
+- a function, step, that advances the probe one step.
+- a function, flight, that repeats until probe hits the target or passes out of reach.
+- a boolean, hit-target?, that tells us whether the probe has hit the target
+- a boolean, in-range? that tells us whether the probe is out of range (stop IOW)
+- a hash, hits, with starting velocity as the key and max-y as the value.
 
 Only one more question: what range of velocities should I try? I don't want to
 search an infinite set. Ah this is what makes it not entirely brute force. Can I
 reason out what the ranges of x-v and y-v can be?
 
-x-v has to be > 1 or we go straight up or down. Or both.
-x-y has to be high enough 
-y-v has to be high enough to overcome gravity 
+x-v has to be > 1 or we go straight up or down. Or both. And since it slows
+down by one every step it has to have enough velocity to make it to the left
+edge of the target so:
+
+x-v has to be high enough so as not to peter out (related to y) 
+y-v has to be high enough to overcome gravity (related to x)
+
+It's possible to come up with values that pass right through the target -
+the rules are very specific that a hit must occur at the end of a step.
+
+Ok but here's a weird question, if y-velocity hits zero does it then
+go NEGATIVE?? in which case it bounces back?? That's pathological but
+not prevented by the problem statement.
 
 |#
 
-(struct probe (x y xv yv)) ; contains the current state of the probe
+(struct probe (x y xv yv) #:transparent) ; contains the current state of the probe
 (define hits (make-hash))  ; contains the max-y of all successful launches
-
-(define (step probe) (probe 0 0 0 0)) ; advances the probe one step according to the rules
-
-(define (flight probe velocity) #f) ; tests all the velocites, returns #t if we hit
-
-(define (hit-target? probe) #f) ; have we hit target?
-
-(define (in-range? probe) #f) ; are we still in range? (is it still possible to hit?)
 
 #|==============================================================================|#
 #|                                     CODE                                     |#
 #|==============================================================================|#
 
+;; Probe -> Probe
+;; given a probe position return the next position according to the rules provided
+(define (step p)
+  (probe
+   (let ([next-x (+ (probe-x p) (probe-xv p))])
+     (cond [(<= next-x 0) 0]
+           [(< next-x 0) (add1 next-x)]
+           [(> next-x 0) (sub1 next-x)]))
+   (sub1 (+ (probe-y p) (probe-yv p)))
+   (probe-xv p) (probe-yv p)))
+
+(module+ test
+  (check-equal? (step (probe 0 0 0 0)) (probe 0 -1 0 0))
+  (check-equal? (step (probe -1 2 7 8)) (probe 5 9 7 8)))
+    
+;; Probe -> Natural or #f
+;; Given a probe return the maximum y position 
+;; if the probe hits the target or #f if it misses
+;; !!!
+(define (flight p) 0 )
+
+;; Probe Target -> Boolean
+;; returns true if the probe has hit the target
+(define (hit-target? p t)
+  (let ([x (probe-x p)]
+        [y (probe-y p)])
+    (and (>= x (first t))
+         (<= x (second t))
+         (>= y (third t))
+         (<= y (fourth t))))) 
+
+;; Probe Target -> Boolean
+;; returns true if it's still possible to hit target
+(define (in-range? p t)
+  (let ([x (probe-x p)]
+        [y (probe-y p)])
+    (or (and (positive? (probe-xv p)) (> x (second t)))     ; x is past
+        (and (positive? (probe-yv p)) (< y (fourth t))))))  ; y is past
+
+
 ;(module+ test
 ;  (check-equal? (day17.1 '(20 30 -10 -5) 45))
 
-; (time (printf "2021 AOC Problem 16.1 = ~a\n" (day17.1 input)))
+; (time (printf "2021 AOC Problem 16.1 = ~a\n" (day17.1 (target (file->string "input17.txt")))
 
 #|=================================================================================
                                         PART 2
