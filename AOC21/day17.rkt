@@ -78,33 +78,63 @@ y-v has to be high enough to overcome gravity (related to x)
 It's possible to come up with values that pass right through the target -
 the rules are very specific that a hit must occur at the end of a step.
 
-|#
+OH FOR CRYING OUT LOUD!
 
-(struct probe (x y xv yv) #:transparent) ; contains the current state of the probe
-(define hits (make-hash))  ; contains the max-y of all successful launches
+Turns out I could do Part 1 in my head. Well at least all that code isn't wasted.
+Part 2 needs to know more. 
+
+|#
 
 #|==============================================================================|#
 #|                                     CODE                                     |#
 #|==============================================================================|#
 
+;; Target -> Natural
+;; given a target calculate the maximum height a probe
+;; can reach and still hit the target
+(define (max-y-height t)
+  "the sum of a number series ending in n = (n * (n + 1)) / 2"
+  (define (sum-of-numbers n)
+    (/ (* n (add1 n)) 2))    ; triangle numbers
+
+  ; how low can we go? that defines how high we can fly
+  (sum-of-numbers (- (- (target-y-min t)) 1)))
+
+(define (day17.1 str)
+  (max-y-height (make-target str)))
+
+(module+ test
+  (check-equal? (day17.1 "target area: x=20..30, y=-10..-5") 45))
+
+(time (printf "2021 AOC Problem 16.1 = ~a\n" (day17.1 (file->string "input17.txt"))))
+
+#|=================================================================================
+                                        PART 2
+                               
+How many distinct initial velocity values cause the probe to be within the target
+area after any step?
+
+==================================================================================|#
+
+(struct probe (x y xv yv) #:transparent) ; contains the current state of the probe
+
 ;; Probe -> Probe
 ;; given a probe position return the next position according to the rules provided
 (define (step p)
-  (probe
+    (probe
+     ; new x-pos
+     (if (<= (probe-x p) 0)            ; velocity has bottomed out
+         0                             ; so we ain't movin'
+         (+ (probe-x p) (probe-xv p))) ; otherwise move by x velocity
 
-   ; new x-pos
-   (if (<= (probe-x p) 0)            ; velocity has bottomed out
-       0                             ; so we ain't movin'
-       (+ (probe-x p) (probe-xv p))) ; otherwise move by x velocity
-
-   ; new y-pos 
-   (+ (probe-y p) (probe-yv p))
+     ; new y-pos 
+     (+ (probe-y p) (probe-yv p))
        
-   ; new x-velocity
-   (sub1 (probe-xv p))
+     ; new x-velocity
+     (sub1 (probe-xv p))
      
-   ; new y-velocity
-   (sub1 (probe-yv p))))
+     ; new y-velocity
+     (sub1 (probe-yv p))))
 
 (module+ test
   (check-equal? (step (probe 0 0 0 0)) (probe 0 0 -1 -1))
@@ -134,24 +164,15 @@ the rules are very specific that a hit must occur at the end of a step.
   (check-equal? (in-range? (probe 26 -9 0 0) (target 20 30 -5 -10)) #t))
 
 ;; Probe -> Natural or #f
-;; Given a probe return the maximum y position 
-;; if the probe hits the target or #f if it misses
-;; !!!
-(define (flight p) 0 )
+;; Given a probe return #t if it hits the target 
+;; #f if it misses
+(define (flight p t)
+  (cond [(hit-target? p) #t]
+        [(not (in-range? p t)) #f]
+        [else (flight (step p) t)]))
 
 ;(module+ test
-;  (check-equal? (day17.1 "target area: x=20..30, y=-10..-5") 45)
-
-; (time (printf "2021 AOC Problem 16.1 = ~a\n" (day17.1 (file->string "input17.txt"))
-
-#|=================================================================================
-                                        PART 2
-                               
-
-==================================================================================|#
-
-;(module+ test
-;  (check-equal? (day17.2 test-data) 0))
+;  (check-equal? (day17.2 "target area: x=20..30, y=-10..-5") 112))
 
 ; (time (printf "2021 AOC Problem 17.2 = ~a\n" (day16.2 input)))
 
