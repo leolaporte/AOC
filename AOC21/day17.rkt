@@ -112,12 +112,6 @@ the rules are very specific that a hit must occur at the end of a step.
   (check-equal? (step (probe 0 -2 7 8)) (probe 0 6 6 7))
   (check-equal? (step (probe 1 -2 7 -8)) (probe 8 -10 6 -9)))
     
-;; Probe -> Natural or #f
-;; Given a probe return the maximum y position 
-;; if the probe hits the target or #f if it misses
-;; !!!
-(define (flight p) 0 )
-
 ;; Probe Target -> Boolean
 ;; returns true if the probe has hit the target
 (define (hit-target? p t)
@@ -131,12 +125,19 @@ the rules are very specific that a hit must occur at the end of a step.
 ;; Probe Target -> Boolean
 ;; returns true if it's still possible to hit target
 (define (in-range? p t)
-  (or (> (probe-x p) (target-x-max t))   ; x is past
-      (< (probe-y p) (target-y-min t)))) ; y is past
+  (and (<= (probe-x p) (target-x-max t))   
+       (>= (probe-y p) (target-y-max t)))) 
 
 (module+ test
-  (check-equal? (in-range? (probe 5 -3 0 0) '(20 30 10 -5)) #t)
-  (check-equal? (in-range? (probe 26 5 0 0) '(20 30 10 -5)) #f))
+  (check-equal? (in-range? (probe 5 -9 0 0) (target 20 30 -5 -10)) #t)
+  (check-equal? (in-range? (probe 26 -11 0 0) (target 20 30 -5 -10)) #f)
+  (check-equal? (in-range? (probe 26 -9 0 0) (target 20 30 -5 -10)) #t))
+
+;; Probe -> Natural or #f
+;; Given a probe return the maximum y position 
+;; if the probe hits the target or #f if it misses
+;; !!!
+(define (flight p) 0 )
 
 ;(module+ test
 ;  (check-equal? (day17.1 "target area: x=20..30, y=-10..-5") 45)
