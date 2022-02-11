@@ -68,6 +68,10 @@ y-v has to be high enough to overcome gravity (related to x)
 It's possible to come up with values that pass right through the target -
 the rules are very specific that a hit must occur at the end of a step.
 
+Ok but here's a weird question, if y-velocity hits zero does it then
+go NEGATIVE?? in which case it bounces back?? That's pathological but
+not prevented by the problem statement.
+
 |#
 
 (struct probe (x y xv yv) #:transparent) ; contains the current state of the probe
@@ -81,26 +85,16 @@ the rules are very specific that a hit must occur at the end of a step.
 ;; given a probe position return the next position according to the rules provided
 (define (step p)
   (probe
-
-   ; new x-pos
-   (if (<= (probe-x p) 0)            ; velocity has bottomed out
-       0                             ; so we ain't movin'
-       (+ (probe-x p) (probe-xv p))) ; otherwise move by x velocity
-
-   ; new y-pos 
-   (+ (probe-y p) (probe-yv p))
-       
-   ; new x-velocity
-   (sub1 (probe-xv p))
-     
-   ; new y-velocity
-   (sub1 (probe-yv p))))
+   (let ([next-x (+ (probe-x p) (probe-xv p))])
+     (cond [(<= next-x 0) 0]
+           [(< next-x 0) (add1 next-x)]
+           [(> next-x 0) (sub1 next-x)]))
+   (sub1 (+ (probe-y p) (probe-yv p)))
+   (probe-xv p) (probe-yv p)))
 
 (module+ test
-  (check-equal? (step (probe 0 0 0 0)) (probe 0 0 -1 -1))
-  (check-equal? (step (probe 1 2 7 8)) (probe 8 10 6 7))
-  (check-equal? (step (probe 0 -2 7 8)) (probe 0 6 6 7))
-  (check-equal? (step (probe 1 -2 7 -8)) (probe 8 -10 6 -9)))
+  (check-equal? (step (probe 0 0 0 0)) (probe 0 -1 0 0))
+  (check-equal? (step (probe -1 2 7 8)) (probe 5 9 7 8)))
     
 ;; Probe -> Natural or #f
 ;; Given a probe return the maximum y position 
@@ -121,8 +115,10 @@ the rules are very specific that a hit must occur at the end of a step.
 ;; Probe Target -> Boolean
 ;; returns true if it's still possible to hit target
 (define (in-range? p t)
-    (or (> (probe-x p) (second t))    ; x is past
-        (< (probe-y p) (fourth t))))  ; y is past
+  (let ([x (probe-x p)]
+        [y (probe-y p)])
+    (or (and (positive? (probe-xv p)) (> x (second t)))     ; x is past
+        (and (positive? (probe-yv p)) (< y (fourth t))))))  ; y is past
 
 
 ;(module+ test
