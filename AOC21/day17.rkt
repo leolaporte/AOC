@@ -5,7 +5,7 @@
 
 #|==============================================================================
 
---- Day 17: Trick Shot ---
+                          --- Day 17: Trick Shot ---
 
 The probe's x,y position starts at 0,0. Then, it will follow some trajectory by
 moving in steps. On each step, these changes occur in the following order:
@@ -34,11 +34,21 @@ highest y position it reaches on this trajectory?
 ; Data is pretty simple...
 ; "target area: x=248..285, y=-85..-56"
 
-;; String -> (list-of Number)
-;; given the problem provided coordinate string, return a list of values
-;; defining a target rectangle containing four points:
-;; (top-left, top-right, bottom-left, bottom-right)
-(define (target str) (map string->number (regexp-match* #px"(\\d+)" str)))
+(struct target (x-min x-max y-min y-max) #:transparent)
+
+;; String -> Target
+;; given the problem provided coordinate string, return a
+;; Target structure
+(define (make-target str)
+  (let ([t-list (map string->number (regexp-match* #px"(-?\\d+)" str))])
+    (target (first t-list)
+            (second t-list)
+            (third t-list)
+            (fourth t-list))))
+
+(module+ test
+  (check-equal? (make-target "target area: x=248..285, y=-85..-56")
+                (target 248 285 -85 -56)))
 
 #|==============================================================================|#
 #|                                     NOTES                                    |#
@@ -111,24 +121,27 @@ the rules are very specific that a hit must occur at the end of a step.
 ;; Probe Target -> Boolean
 ;; returns true if the probe has hit the target
 (define (hit-target? p t)
-  (let ([x (probe-x p)]
-        [y (probe-y p)])
-    (and (>= x (first t))
-         (<= x (second t))
-         (>= y (third t))
-         (<= y (fourth t))))) 
+  (and (>= (target-x-max t) (probe-x p) (target-x-min t))   
+       (>= (target-y-max t) (probe-y p) (target-y-min t))))
+
+(module+ test
+  (check-equal? (hit-target? (probe 10 20 0 0) (target 10 15 20 25)) #t)
+  (check-equal? (hit-target? (probe 10 20 0 0) (target 20 25 20 25)) #f))
 
 ;; Probe Target -> Boolean
 ;; returns true if it's still possible to hit target
 (define (in-range? p t)
-    (or (> (probe-x p) (second t))    ; x is past
-        (< (probe-y p) (fourth t))))  ; y is past
+  (or (> (probe-x p) (target-x-max t))   ; x is past
+      (< (probe-y p) (target-y-min t)))) ; y is past
 
+(module+ test
+  (check-equal? (in-range? (probe 5 -3 0 0) '(20 30 10 -5)) #t)
+  (check-equal? (in-range? (probe 26 5 0 0) '(20 30 10 -5)) #f))
 
 ;(module+ test
-;  (check-equal? (day17.1 '(20 30 -10 -5) 45))
+;  (check-equal? (day17.1 "target area: x=20..30, y=-10..-5") 45)
 
-; (time (printf "2021 AOC Problem 16.1 = ~a\n" (day17.1 (target (file->string "input17.txt")))
+; (time (printf "2021 AOC Problem 16.1 = ~a\n" (day17.1 (file->string "input17.txt"))
 
 #|=================================================================================
                                         PART 2
