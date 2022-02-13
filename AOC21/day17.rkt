@@ -216,15 +216,16 @@ a way. Meanwhile I'll just plug in -100 .. 100
 The yv range is another matter. It can be negative or positive.
 yv-min is the number that would hit the target
 in one shot, (target-y-min t). Not sure how to figure the highest
-so I'll choose 100 and see if it works. It does!
+so I'll choose 100 and see if it works. It does! But, one more
+optimization... we already calculated yv-max in Part 1! Ta-da!
 |#
 
 (define (day17.2 str)
   (let ([t (make-target str)])
     (test-flights (minimum-x-velocity (target-x-min t) 0)
                   (add1 (target-x-max t)) 
-                  (target-y-min t)        ; velocity that gets there in 1 step
-                  100 ; completely arbitrary fudge factor
+                  (target-y-min t)           ; velocity that gets there in 1 step
+                  (- (- (target-y-min t)) 1) ; value from part 1!
                   t)))
 
 (module+ test
@@ -238,6 +239,6 @@ Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
 2021 AOC Problem 16.1 = 3570
 cpu time: 0 real time: 0 gc time: 0
 2021 AOC Problem 17.2 = 1919
-cpu time: 65 real time: 68 gc time: 7
+cpu time: 57 real time: 62 gc time: 7
 
 |#
