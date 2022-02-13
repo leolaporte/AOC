@@ -216,7 +216,7 @@ see below!
 ;; (this starts at the left edge of the target and works backward from a
 ;; velocity of zero by adding 1 each step until it goes past the 0 point.)
 (define (min-xv target velocity)
-  (cond [(<= target 0) (sub1 velocity)]  ; stops when it flies past origin, so 1 less
+  (cond [(< target 0) (sub1 velocity)]  ; only stops when it flies past origin, so 1 less
         [else (min-xv (- target velocity) (add1 velocity))]))
 
 #|
@@ -232,14 +232,14 @@ Ta-da!
 (define (day17.2 str)
   (let ([t (make-target str)])                ; where are we aiming?
     ; provide ranges for the brute-force tests
-    (test-flights (min-xv (target-x-min t) 0) ; minimum xv 
+    (test-flights (min-xv (target-x-min t) 0) ; calculated minimum xv 
                   (add1 (target-x-max t))     ; max xv (gets there in 1 step)
                   (target-y-min t)            ; min yv (gets there in 1 step)
                   (- (- (target-y-min t)) 1)  ; max yv (value from part 1!)
                   t)))
 
 (module+ test
-  (check-equal? (day17.2 "target area: x=20..30, y=-10..-5") 112))
+  (check-equal? (day17.2 "target area: x=20..30, y=-10..-5") 112)) ; 520 iterations
 
 (time (printf "2021 AOC Problem 17.2 = ~a\n" (day17.2 (file->string "input17.txt"))))
 
@@ -247,8 +247,8 @@ Ta-da!
 Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
 
 2021 AOC Problem 16.1 = 3570
-cpu time: 0 real time: 0 gc time: 0
+cpu time: 0 real time: 1 gc time: 0
 2021 AOC Problem 17.2 = 1919
-cpu time: 57 real time: 62 gc time: 7
+cpu time: 56 real time: 56 gc time: 5 (with provided target data performs 45,050 iterations)
 
 |#
