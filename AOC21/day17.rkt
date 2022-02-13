@@ -62,6 +62,7 @@ First instinct is to brute force it. Let's see how fast that is.
 - a function, flight, that repeats until probe hits the target or passes out of reach.
 - a boolean, hit-target?, that tells us whether the probe has hit the target
 - a boolean, out-of-range? that tells us whether the probe is out of range
+- a loop for test-firings to find the highest y value
 
 Only one more question: what range of velocities should I try? I don't want to
 search an infinite set. Ah this is what makes it not entirely brute force. Can I
@@ -79,8 +80,9 @@ the rules are very specific that a hit must occur at the end of a step.
 
 OH FOR CRYING OUT LOUD!
 
-Turns out I could do Part 1 in my head. Well at least all that code isn't wasted.
-Part 2 needs to know more. 
+With some hints from /r/adventofcode I realized I could do Part 1 in my
+head. Well at least all that code isn't wasted. Part 2 needs to know more.
+(And, surprise, at the very end, Part 1's solution comes in handy.)
 
 |#
 
@@ -89,7 +91,7 @@ Part 2 needs to know more.
 #|==============================================================================|#
 
 (define (sum-of-numbers n)
-  "the sum of a number series ending in n = (n * (n + 1)) / 2"
+  "the sum of an integer series ending in n = (n * (n + 1)) / 2"
   (/ (* n (add1 n)) 2))    ; triangle numbers
 
 ;; Target -> Natural
@@ -97,7 +99,8 @@ Part 2 needs to know more.
 ;; can reach and still hit the target
 (define (max-y-height t)
   ; how low can we go? that defines how high we can fly
-  (sum-of-numbers (- (- (target-y-min t)) 1)))
+  (sum-of-numbers               ; the maximum height of the probe
+   (- (- (target-y-min t)) 1))) ; is determined by the lowest point on t
 
 (define (day17.1 str)
   (max-y-height (make-target str)))
@@ -118,21 +121,24 @@ area after any step?
 #|
 Two ways to go about this. One is my original plan to try all the possibilities
 and count up the hits. Given reasonable boundaries on the x and y velocities
-this is pretty quick.
+this could be pretty quick.
 
 The other way - inspired by the backwards way I solved part one - is to calculate
 the set of triangle numbers for x and y and find the intersection with the set
 of points in the target. That should work too.
 
-I've already written the code for method one so let's see if we can get it fast
-enuf. (Turns out it's plenty fast so I'll leave the second method to another
-time.)
+I've already written the brute force code, though, in my aborted attempt to
+solve part 1, so let's see if we can get it fast enuf.
+
+(Turns out it's plenty fast so I'll leave the second method to another time.)
 
 |#
 (struct probe (x y xv yv) #:transparent) ; contains the current state of the probe
 
 ;; Probe -> Probe
-;; given a probe position return the next position according to the rules provided
+;; given a probe position return the next position according submarine phyics
+;; (on earth, gravity accelerates at 32m/sec^2 - but you also have to consider
+;; drag from the air. I guess underwater the drag is more like 1m/sec^2.)
 (define (step p)
   (probe
    ; new x-pos
@@ -140,8 +146,8 @@ time.)
        (probe-x p)                   ; so we ain't movin'
        (+ (probe-x p) (probe-xv p))) ; otherwise move by x velocity
    (+ (probe-y p) (probe-yv p))      ; new y-pos 
-   (sub1 (probe-xv p))               ; new x-velocity
-   (sub1 (probe-yv p))))             ; new y-velocity
+   (sub1 (probe-xv p))               ; new x-velocity (drag)
+   (sub1 (probe-yv p))))             ; new y-velocity (drag)
   
 (module+ test
   (check-equal? (step (probe 0 0 0 0)) (probe 0 0 -1 -1))
@@ -162,12 +168,13 @@ time.)
 ;; Probe Target -> Boolean
 ;; returns true if target can no longer be reached
 (define (out-of-range? p t)
-  (or (> (probe-x p) (target-x-max t))
-      (< (probe-y p) -100)))  ; this number is a wild guess
+  (or (> (probe-x p) (target-x-max t))   ; too far right
+      (< (probe-y p) (target-y-min t)))) ; too low (are there be values of yv that work here?)
 
 (module+ test
-  (check-equal? (out-of-range? (probe 31 -9 0 0) (target 20 30 -5 -10)) #t)
-  (check-equal? (out-of-range? (probe 26 -11 0 0) (target 20 30 -5 -10)) #f))
+  (check-equal? (out-of-range? (probe 31 -9 0 0) (target 20 30 -10 -5)) #t)
+  (check-equal? (out-of-range? (probe 26 -11 0 0) (target 20 30 -10 -5)) #t)
+  (check-equal? (out-of-range? (probe 26 -6 0 0) (target 20 30 -10 -5)) #f))
 
 ;; Probe -> Natural or #f
 ;; Given a probe return #t if it hits the target 
@@ -180,6 +187,7 @@ time.)
 ;; Natural Natural Natural Natural Target -> Natural
 ;; given the minimum and maximum velocities for x and y
 ;; return the number of successful flights
+;; (brute force but within a reasonable range of values)
 (define (test-flights xv-min xv-max yv-min yv-max t)
   (for*/fold ([hits 0])
              ([xv (in-range xv-min (add1 xv-max))]
@@ -193,39 +201,41 @@ time.)
 This will be way too slow unless I can calculate reasonable
 ranges for xv and yv.
 
-xv isn't too hard: vx-min = the lowest velocity that gets to the target,
-and vx-max = right edge of the target (any higher and the first shot
+xv isn't too hard: xv-min = the lowest velocity that gets to the target,
+and xv-max = right edge of the target (any higher and the first shot
 will go right past the target).
 
 I'll have to think about what vy-max should be. I'm sure there's
-a way. Meanwhile I'll just plug in -100 .. 100
+a way. Meanwhile I'll just plug in -100 .. 100. Which works but...
+see below!
 |#
 
 ;; Natural Natural -> Natural
-;; Given a target point and a velocity calculate
-;; the lowest starting velocity at point 0 that
-;; will get to the target - this starts at the left
-;; edge of the target and works backward from a
-;; velocity of zero by adding 1 each step until
-;; it goes past the 0 point.
-(define (minimum-x-velocity target velocity)
-  (cond [(<= target 0) (sub1 velocity)]
-        [else (minimum-x-velocity (- target velocity) (add1 velocity))]))
+;; Given a target point and a velocity calculate the lowest starting
+;; velocity at point 0 that will get to the target
+;; (this starts at the left edge of the target and works backward from a
+;; velocity of zero by adding 1 each step until it goes past the 0 point.)
+(define (min-xv target velocity)
+  (cond [(<= target 0) (sub1 velocity)]  ; stops when it flies past origin, so 1 less
+        [else (min-xv (- target velocity) (add1 velocity))]))
 
 #|
 The yv range is another matter. It can be negative or positive.
-yv-min is the number that would hit the target
-in one shot, (target-y-min t). Not sure how to figure the highest
-so I'll choose 100 and see if it works. It does! But, one more
-optimization... we already calculated yv-max in Part 1! Ta-da!
+yv-min is the number that would hit the target in one shot, (target-y-min t).
+
+Not sure how to figure the highest so I'll choose 100 and see if it works.
+It does! But, one more optimization... we already calculated yv-max in Part 1!
+
+Ta-da!
 |#
 
 (define (day17.2 str)
-  (let ([t (make-target str)])
-    (test-flights (minimum-x-velocity (target-x-min t) 0)
-                  (add1 (target-x-max t)) 
-                  (target-y-min t)           ; velocity that gets there in 1 step
-                  (- (- (target-y-min t)) 1) ; value from part 1!
+  (let ([t (make-target str)])                ; where are we aiming?
+    ; provide ranges for the brute-force tests
+    (test-flights (min-xv (target-x-min t) 0) ; minimum xv 
+                  (add1 (target-x-max t))     ; max xv (gets there in 1 step)
+                  (target-y-min t)            ; min yv (gets there in 1 step)
+                  (- (- (target-y-min t)) 1)  ; max yv (value from part 1!)
                   t)))
 
 (module+ test
