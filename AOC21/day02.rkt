@@ -1,47 +1,16 @@
 #lang racket
-;  AOC 2021
-; Leo Laporte, 1 December 2021
-; 
-; --- Day 2: Dive! ---
-; 
-; Now, you need to figure out how to pilot this thing.
-; 
-; It seems like the submarine can take a series of commands like forward 1,
-; down 2, or up 3:
-; 
-; forward X increases the horizontal position by X units.
-; down X increases the depth by X units.
-; up X decreases the depth by X units.
-; Note that since you're on a submarine, down and up affect your depth,
-; and so they have the opposite result of what you might expect.
-; 
-; The submarine seems to already have a planned course (your puzzle input).
-; You should probably figure out where it's going. For example:
-; 
-; forward 5
-; down 5
-; forward 8
-; up 3
-; down 8
-; forward 2
-; Your horizontal position and depth both start at 0. The steps above would
-; then modify them as follows:
-; 
-; forward 5 adds 5 to your horizontal position, a total of 5.
-; down 5 adds 5 to your depth, resulting in a value of 5.
-; forward 8 adds 8 to your horizontal position, a total of 13.
-; up 3 decreases your depth by 3, resulting in a value of 2.
-; down 8 adds 8 to your depth, resulting in a value of 10.
-; forward 2 adds 2 to your horizontal position, a total of 15.
-; After following these instructions, you would have a horizontal position of
-; 15 and a depth of 10. (Multiplying these together produces 150.)
-; 
-; Calculate the horizontal position and depth you would have after following
-; the planned course. What do you get if you multiply your final horizontal
-; position by your final depth?
 
+#|
+  AOC 2021
+ Leo Laporte, 1 December 2021
 
-(require racket/file rackunit)
+ Calculate the horizontal position and depth you would have after following
+ the planned course. What do you get if you multiply your final horizontal
+ position by your final depth?
+|#
+
+(require racket/file
+         rackunit)
 
 ;; Problem input from adventofcode.com
 (define day2data (string-split (file->string "input2.txt") "\n")) ; turn it into a list-of moves
@@ -53,11 +22,13 @@
 ;; (list-of string) -> Integer
 ;; given a list of moves, return the resulting position as the product of the distance and depth
 (define (day2.1 lst)
-  (local [(define (make-moves horiz depth l)
-            (cond [(empty? l) (* horiz depth)]  ; done, return product of horiz and depth
-                  [else (let ([pos (make-one-move horiz depth (first l))]) ; process move
-                          (make-moves (car pos) (cdr pos) (rest l)))]))]   ; get next move
-    (make-moves 0 0 lst)))
+  
+  (define (make-moves horiz depth l)
+    (cond [(empty? l) (* horiz depth)]  ; done, return product of horiz and depth
+          [else (let ([pos (make-one-move horiz depth (first l))]) ; process move
+                  (make-moves (car pos) (cdr pos) (rest l)))]))  ; get next move
+  
+  (make-moves 0 0 lst))
 
 ;; integer integer string -> (integer . integer)
 ;; given a move and the current position, return the new position (horiz . depth)
@@ -71,47 +42,16 @@
       ("down" (cons horiz (+ depth dist)))))) ; dive by dist
 
 (module+ test
- (check-equal? (day2.1 sample-data) 150))
+  (check-equal? (day2.1 sample-data) 150))
 
 (time (printf "2021 AOC Problem 2.1 = ~a\n" (day2.1 day2data)))
 
-;  --- Part Two ---
-; 
-; Based on your calculations, the planned course doesn't seem to make any sense.
-; You find the submarine manual and discover that the process is actually slightly
-; more complicated.
-; 
-; In addition to horizontal position and depth, you'll also need to track a third
-; value, aim, which also starts at 0. The commands also mean something entirely
-; different than you first thought:
-; 
-; down X increases your aim by X units.
-; up X decreases your aim by X units.
-; forward X does two things:
-; It increases your horizontal position by X units.
-; It increases your depth by your aim multiplied by X.
-; Again note that since you're on a submarine, down and up do the opposite of what
-; you might expect: "down" means aiming in the positive direction.
-; 
-; Now, the above example does something different:
-; 
-; forward 5 adds 5 to your horizontal position, a total of 5. Because your aim is 0,
-; your depth does not change.
-; down 5 adds 5 to your aim, resulting in a value of 5.
-; forward 8 adds 8 to your horizontal position, a total of 13. Because your aim is 5,
-; your depth increases by 8*5=40.
-; up 3 decreases your aim by 3, resulting in a value of 2.
-; down 8 adds 8 to your aim, resulting in a value of 10.
-; forward 2 adds 2 to your horizontal position, a total of 15. Because your aim is 10,
-; your depth increases by 2*10=20 to a total of 60.
-; After following these new instructions, you would have a horizontal position of 15
-; and a depth of 60. (Multiplying these produces 900.)
-; 
-; Using this new interpretation of the commands, calculate the horizontal position and
-; depth you would have after following the planned course. What do you get if you multiply
-; your final horizontal position by your final depth?
-; 
-
+#|
+  --- Part Two ---
+ Using this new interpretation of the commands, calculate the horizontal position and
+ depth you would have after following the planned course. What do you get if you multiply
+ your final horizontal position by your final depth?
+|# 
 
 ;; (list-of string) -> Integer
 ;; given a list of dir and aim, return the resulting position as the product of the distance and depth
@@ -138,14 +78,20 @@
 
 (time (printf "2021 AOC Problem 2.2 = ~a\n" (day2.2 day2data)))
 
-; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
-;2021 AOC Problem 2.1 = 1524750
-;cpu time: 2 real time: 2 gc time: 0
-;2021 AOC Problem 2.2 = 1592426537
-;cpu time: 1 real time: 1 gc time: 0
 
-; Real world timing
-;      --------Part 1--------   --------Part 2--------
-;Day       Time   Rank  Score       Time   Rank  Score
-;  2   00:38:41  13051      0   01:06:26  14647      0
-;  1   00:24:22   7349      0   12:27:40  59726      0
+#|
+Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+
+2021 AOC Problem 2.1 = 1524750
+cpu time: 0 real time: 0 gc time: 0
+2021 AOC Problem 2.2 = 1592426537
+cpu time: 0 real time: 0 gc time: 0
+
+Real world timing
+
+      --------Part 1--------   --------Part 2--------
+Day       Time   Rank  Score       Time   Rank  Score
+  2   00:38:41  13051      0   01:06:26  14647      0
+  1   00:24:22   7349      0   12:27:40  59726      0
+
+|#
