@@ -1,62 +1,17 @@
 #lang racket
-;   AOC 2021
-;  Leo Laporte
-;  
-;  --- Day 5: Hydrothermal Venture ---
-;  
-;  You come across a field of hydrothermal vents on the ocean floor! These vents constantly
-;  produce large, opaque clouds, so it would be best to avoid them if possible.
-;  
-;  They tend to form in lines; the submarine helpfully produces a list of nearby lines of vents
-;  (your puzzle input) for you to review. For example:
-;  
-;  0,9 -> 5,9
-;  8,0 -> 0,8
-;  9,4 -> 3,4
-;  2,2 -> 2,1
-;  7,0 -> 7,4
-;  6,4 -> 2,0
-;  0,9 -> 2,9
-;  3,4 -> 1,4
-;  0,0 -> 8,8
-;  5,5 -> 8,2
-;  
-;  Each line of vents is given as a line segment in the format x1,y1 -> x2,y2 where x1,y1
-;  are the coordinates of one end the line segment and x2,y2 are the coordinates of the other end.
-;  These line segments include the points at both ends. In other words:
-;  
-;      An entry like 1,1 -> 1,3 covers points 1,1, 1,2, and 1,3.
-;      An entry like 9,7 -> 7,7 covers points 9,7, 8,7, and 7,7.
-;  
-;  For now, only consider horizontal and vertical lines: lines where either x1 = x2 or y1 = y2.
-;  
-;  So, the horizontal and vertical lines from the above list would produce the following diagram:
-;  
-;  .......1..
-;  ..1....1..
-;  ..1....1..
-;  .......1..
-;  .112111211
-;  ..........
-;  ..........
-;  ..........
-;  ..........
-;  222111....
-;  
-;  In this diagram, the top left corner is 0,0 and the bottom right corner is 9,9. Each position
-;  is shown as the number of lines which cover that point or . if no line covers that point.
-;  The top-left pair of 1s, for example, comes from 2,2 -> 2,1; the very bottom row is formed
-;  by the overlapping lines 0,9 -> 5,9 and 0,9 -> 2,9.
-;  
-;  To avoid the most dangerous areas, you need to determine the number of points where at
-;  least two lines overlap. In the above example, this is anywhere in the diagram with a 2
-;  or larger - a total of 5 points.
-;  
-;  Consider only horizontal and vertical lines. At how many points do at least two lines overlap?
-; 
+ #|
 
+  AOC 2021
+  Leo Laporte
+  
+  --- Day 5: Hydrothermal Venture ---
+    
+  Consider only horizontal and vertical lines. At how many points do at least two lines overlap?
 
-(require racket/file threading rackunit)
+|#
+
+(require threading
+         rackunit)
 
 ;; Problem input from adventofcode.com
 (define day5data (file->string "input5.txt"))
@@ -72,24 +27,27 @@
 (define sample-points (list '(0 9 5 9) '(8 0 0 8) '(9 4 3 4) '(2 2 2 1) '(7 0 7 4)
                             '(6 4 2 0) '(0 9 2 9) '(3 4 1 4) '(0 0 8 8) '(5 5 8 2)))
 
-;; NOTES
-;; This looks pretty easy. Too easy...
-;; Convert the input to a list of lines, each line stored as four points (x1 y1 x2 y2)
-;; Convert each line into the set of points it touches: ((x1,y1)..(x2,y2))
-;; for each point in the set increment that point's entry in a hash table, if a point
-;; is not in the hash add it, count total number of points with more than one entry
-;;
-;; Oh and it WAS too easy... there are two additional tricky points
-;; 1) the provided end points can be right->left as well as left->right, and bottom->top
-;; as well as top->bottom (make sure to account for those)
-;; 2) some of the provided lines might be diagonals(!) and for part 1 we needn't consider
-;; them.
-;;
-;; Just in case we need to pay attention to diagonals in part two, I need to write the
-;; point generator to handle both these cases. For now, I can eliminate the diagonals.
-;;
-;; Update: re-wrote the point generator, but it's ugly. I'm sure there's a better way
-;; to do it with Racket iterators. I'll investigate some day. 
+#|
+ NOTES
+ This looks pretty easy. Too easy...
+ Convert the input to a list of lines, each line stored as four points (x1 y1 x2 y2)
+ Convert each line into the set of points it touches: ((x1,y1)..(x2,y2))
+ for each point in the set increment that point's entry in a hash table, if a point
+ is not in the hash add it, count total number of points with more than one entry
+
+ Oh and it WAS too easy... there are two additional tricky points
+ 1) the provided end points can be right->left as well as left->right, and bottom->top
+ as well as top->bottom (make sure to account for those)
+ 2) some of the provided lines might be diagonals(!) and for part 1 we needn't consider
+ them.
+
+ Just in case we need to pay attention to diagonals in part two, I need to write the
+ point generator to handle both these cases. For now, I can eliminate the diagonals.
+
+ Update: re-wrote the point generator, but it's ugly. I'm sure there's a better way
+ to do it with Racket iterators. I'll investigate some day.
+
+|#
 
 (define (count-multipoint-entries hsh)
   (length (filter (λ (x) (> x 1)) (hash-values hsh))))
@@ -165,37 +123,16 @@
 
 (time (printf "2021 AOC Problem 5.1 = ~a\n" (day5.1 input-points)))
 
-;   --- Part Two ---
-;  
-;  Unfortunately, considering only horizontal and vertical lines doesn't give you the full
-;  picture; you need to also consider diagonal lines.
-;  
-;  Because of the limits of the hydrothermal vent mapping system, the lines in your list
-;  will only ever be horizontal, vertical, or a diagonal line at exactly 45 degrees. In other words:
-;  
-;  An entry like 1,1 -> 3,3 covers points 1,1, 2,2, and 3,3.
-;  An entry like 9,7 -> 7,9 covers points 9,7, 8,8, and 7,9.
-;  Considering all lines from the above example would now produce the following diagram:
-;  
-;  1.1....11.
-;  .111...2..
-;  ..2.1.111.
-;  ...1.2.2..
-;  .112313211
-;  ...1.2....
-;  ..1...1...
-;  .1.....1..
-;  1.......1.
-;  222111....
-;  
-;  You still need to determine the number of points where at least two lines overlap.
-;  In the above example, this is still anywhere in the diagram with a 2 or larger - now a
-;  total of 12 points.
-;  
-;  Consider all of the lines. At how many points do at least two lines overlap?
-;  
-; 
+#|
 
+   --- Part Two ---
+  
+  Unfortunately, considering only horizontal and vertical lines doesn't give you the full
+  picture; you need to also consider diagonal lines.
+    
+  Consider all of the lines. At how many points do at least two lines overlap?
+  
+|#
 
 ;; NOTES: I KNEW it!! Rewriting make-point-list to include 45 degree diagonal lines.
 
@@ -210,17 +147,23 @@
 
 (time (printf "2021 AOC Problem 5.2 = ~a\n" (day5.2 input-points)))
 
-; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
-;2021 AOC Problem 5.1 = 7468
-;cpu time: 450 real time: 464 gc time: 21
-;2021 AOC Problem 5.2 = 22364
-;cpu time: 1639 real time: 1677 gc time: 88
+#|
 
-; Real world timing
-;      --------Part 1---------   --------Part 2--------
-;Day       Time    Rank  Score       Time   Rank  Score
-;  5       >24h   71260      0       >24h  68517      0
-;  4       >24h   77972      0       >24h  75701      0
-;  3       >24h  102352      0       >24h  88448      0
-;  2   00:38:41   13051      0   01:06:26  14647      0
-;  1   00:24:22    7349      0   12:27:40  59726      0
+ Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+
+2021 AOC Problem 5.1 = 7468
+cpu time: 112 real time: 114 gc time: 29
+2021 AOC Problem 5.2 = 22364
+cpu time: 207 real time: 212 gc time: 38
+
+ Real world timing
+
+      --------Part 1---------   --------Part 2--------
+Day       Time    Rank  Score       Time   Rank  Score
+  5       >24h   71260      0       >24h  68517      0
+  4       >24h   77972      0       >24h  75701      0
+  3       >24h  102352      0       >24h  88448      0
+  2   00:38:41   13051      0   01:06:26  14647      0
+  1   00:24:22    7349      0   12:27:40  59726      0
+
+|#

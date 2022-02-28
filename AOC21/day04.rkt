@@ -1,116 +1,49 @@
 #lang racket
-;  AOC 2021
-; Leo Laporte 5-Dec-2021
-; 
-; --- Day 4: Giant Squid ---
-; 
-; You're already almost 1.5km (almost a mile) below the surface of the ocean, already
-; so deep that you can't see any sunlight. What you can see, however, is a giant squid
-; that has attached itself to the outside of your submarine.
-; 
-; Maybe it wants to play bingo?
-; 
-; Bingo is played on a set of boards each consisting of a 5x5 grid of numbers. Numbers
-; are chosen at random, and the chosen number is marked on all boards on which it appears.
-; (Numbers may not appear on all boards.) If all numbers in any row or any column of a
-; board are marked, that board wins. (Diagonals don't count.)
-; 
-; The submarine has a bingo subsystem to help passengers (currently, you and the giant
-; squid) pass the time. It automatically generates a random order in which to draw
-; numbers and a random set of boards (your puzzle input). For example:
-; 
-; 7,4,9,5,11,17,23,2,0,14,21,24,10,16,13,6,15,25,12,22,18,20,8,19,3,26,1
-; 
-; 22 13 17 11  0
-;  8  2 23  4 24
-; 21  9 14 16  7
-;  6 10  3 18  5
-;  1 12 20 15 19
-; 
-;  3 15  0  2 22
-;  9 18 13 17  5
-; 19  8  7 25 23
-; 20 11 10 24  4
-; 14 21 16 12  6
-; 
-; 14 21 17 24  4
-; 10 16 15  9 19
-; 18  8 23 26 20
-; 22 11 13  6  5
-;  2  0 12  3  7
-; 
-; After the first five numbers are drawn (7, 4, 9, 5, and 11), there are no winners,
-; but the boards are marked as follows (shown here adjacent to each other to save space):
-; 
-; 22 13 17 11  0         3 15  0  2 22        14 21 17 24  4
-;  8  2 23  4 24         9 18 13 17  5        10 16 15  9 19
-; 21  9 14 16  7        19  8  7 25 23        18  8 23 26 20
-;  6 10  3 18  5        20 11 10 24  4        22 11 13  6  5
-;  1 12 20 15 19        14 21 16 12  6         2  0 12  3  7
-; 
-; After the next six numbers are drawn (17, 23, 2, 0, 14, and 21), there are still no winners:
-; 
-; 22 13 17 11  0         3 15  0  2 22        14 21 17 24  4
-;  8  2 23  4 24         9 18 13 17  5        10 16 15  9 19
-; 21  9 14 16  7        19  8  7 25 23        18  8 23 26 20
-;  6 10  3 18  5        20 11 10 24  4        22 11 13  6  5
-;  1 12 20 15 19        14 21 16 12  6         2  0 12  3  7
-; 
-; Finally, 24 is drawn:
-; 
-; 22 13 17 11  0         3 15  0  2 22        14 21 17 24  4
-;  8  2 23  4 24         9 18 13 17  5        10 16 15  9 19
-; 21  9 14 16  7        19  8  7 25 23        18  8 23 26 20
-;  6 10  3 18  5        20 11 10 24  4        22 11 13  6  5
-;  1 12 20 15 19        14 21 16 12  6         2  0 12  3  7
-; 
-; At this point, the third board wins because it has at least one complete row or
-; column of marked numbers (in this case, the entire top row is marked: 14 21 17 24 4).
-; 
-; The score of the winning board can now be calculated. Start by finding the sum of all
-; unmarked numbers on that board; in this case, the sum is 188. Then, multiply that sum
-; by the number that was just called when the board won, 24, to get the final score,
-; 188 * 24 = 4512.
-; 
-; To guarantee victory against the giant squid, figure out which board will win first.
-; What will your final score be if you choose that board?
-; 
-;  --- Part Two ---
-; 
-; On the other hand, it might be wise to try a different strategy: let the giant squid win.
-; 
-; You aren't sure how many bingo boards a giant squid could play at once, so rather than
-; waste time counting its arms, the safe thing to do is to figure out which board will win
-; last and choose that one. That way, no matter which boards it picks, it will win for sure.
-; 
-; In the above example, the second board is the last to win, which happens after 13 is
-; eventually called and its middle column is completely marked. If you were to keep playing
-; until this point, the second board would have a sum of unmarked numbers equal to 148 for
-; a final score of 148 * 13 = 1924.
-; 
-; Figure out which board will win last. Once it wins,
-;  what would its final score be?
-; 
+
+#|
+AOC 2021
+ Leo Laporte 5-Dec-2021
+ 
+ --- Day 4: Giant Squid ---
+
+ a giant squid has attached itself to the outside of your submarine.
+ 
+ Maybe it wants to play bingo?
+
+ To guarantee victory against the giant squid, figure out which board will win first.
+ What will your final score be if you choose that board?
+
+  --- Part Two ---
+ 
+ On the other hand, it might be wise to try a different strategy: let the giant squid win.
+ 
+ Figure out which board will win last. Once it wins,
+  what would its final score be?
+|#
 
 
-(require racket/file threading rackunit)
+(require racket/file
+         threading
+         rackunit)
 
-;; NOTES
-;; We need to keep track of two kinds of things a list of bingo-balls (list-of Natural)
-;; and a set of bingo-boards: 5x5 matrices containing random specified numbers. (hashes?)
-;; We have to test the bingo-boards: for completed rows or columns after each ball pull
-;; (well not until the fifth move).
-;; 
-;; When one bingo-board has a bingo we add the unmarked values on the winning bingo-board
-;; and multiply that number by the last ball pulled for the solution.
-;;
-;; The problem mostly boils down to choosing the right way to represent the bingo boards.
-;;
-;; The use of hash tables is problematic because of the need to calculate a Bingo
-;; I'll use vectors of numbers, indicate a marked number by setting it to -1
-;; Use vector indices to indicate the rows and column. Check each board
-;; for a row or column of -1
-;;
+#|
+ DATA REPRESENTATION
+
+ We need to keep track of two kinds of things a list of bingo-balls (list-of Natural)
+ and a set of bingo-boards: 5x5 matrices containing random specified numbers. (hashes?)
+ We have to test the bingo-boards: for completed rows or columns after each ball pull
+ (well not until the fifth move).
+ 
+ When one bingo-board has a bingo we add the unmarked values on the winning bingo-board
+ and multiply that number by the last ball pulled for the solution.
+
+ The problem mostly boils down to choosing the right way to represent the bingo boards.
+
+ The use of hash tables is problematic because of the need to calculate a Bingo
+ I'll use vectors of numbers, indicate a marked number by setting it to -1
+ Use vector indices to indicate the rows and column. Check each board
+ for a row or column of -1
+|#
 
 (require racket/vector) ; for (vector-map)
 
@@ -161,27 +94,33 @@
   
 (define MARK -1) ; for when a square on the board is marked
 
-;; 1 get ball number
-;; 2 mark all squares with that number -1
-;; 3 check for a bingo
-;; 4 repeat until bingo
-;; 5 add up #f squares on winning sheet and multiply by last ball called
+#|
+NOTES:
 
-;; UPDATE: Part 1 merely needs to produce the FIRST winning board, but Part 2 introduces an
-;; interesting complication. It wants the LAST board. Suddenly the fact that each ball can
-;; solve multiple boards becomes a problem. 3AM insight: I can solve for both parts by
-;; building a bingo solving machine that solves ALL the boards. Further I realized I don't need
-;; to save the winning boards and the ball that produced them, I only need to save the
-;; problem's solution (sum of remaining squares x ball) - a single digit I can push, in order
-;; onto the list of solved boards. Then I have both answers: the first and last entries in the
-;; list.
-;;
-;; Introducing the all-purpose, general bingo solving machine. It solves ALL the balls
-;; in one pass, saving the solutions for ALL boards in a list. Yes it does more work than
-;; necessary but it's plenty fast enough and a good GENERAL solution to both parts. Racket's
-;; for/fold macro is perfect for this. I'll need to create a new function, solve-boards, that
-;; goes through the boards one ball at a time, removing solved boards for the next iteration, and
-;; building a list of solutions.
+So the steps are:
+
+ 1 get ball number
+ 2 mark all squares with that number -1
+ 3 check for a bingo
+ 4 repeat until bingo
+ 5 add up #f squares on winning sheet and multiply by last ball called
+
+ UPDATE: Part 1 merely needs to produce the FIRST winning board, but Part 2 introduces an
+ interesting complication. It wants the LAST board. Suddenly the fact that each ball can
+ solve multiple boards becomes a problem. 3AM insight: I can solve for both parts by
+ building a bingo solving machine that solves ALL the boards. Further I realized I don't need
+ to save the winning boards and the ball that produced them, I only need to save the
+ problem's solution (sum of remaining squares x ball) - a single digit I can push, in order
+ onto the list of solved boards. Then I have both answers: the first and last entries in the
+ list.
+
+ Introducing the all-purpose, general bingo solving machine. It solves ALL the balls
+ in one pass, saving the solutions for ALL boards in a list. Yes it does more work than
+ necessary but it's plenty fast enough and a good GENERAL solution to both parts. Racket's
+ for/fold macro is perfect for this. I'll need to create a new function, solve-boards, that
+ goes through the boards one ball at a time, removing solved boards for the next iteration, and
+ building a list of solutions.
+|#
 
 ;; (list-of vector) (list-of natural) -> (list-of (list-of vector) (list-of natural))
 ;; given a list of bingo board (stored as vectors) and bingo balls produce
@@ -290,15 +229,19 @@
  (printf "2021 AOC Problem 4.1 = ~a\n" (first solution))
  (printf "2021 AOC Problem 4.2 = ~a\n" (last solution)))
 
-; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
-; 2021 AOC Problem 4.1 = 49686
-; 2021 AOC Problem 4.2 = 26878
-; cpu time: 29 real time: 31 gc time: 0
+#|
+ Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
 
-; Real world timing
-;      --------Part 1---------   --------Part 2--------
-;Day       Time    Rank  Score       Time   Rank  Score
-;  4       >24h   77972      0       >24h  75701      0
-;  3       >24h  102352      0       >24h  88448      0
-;  2   00:38:41   13051      0   01:06:26  14647      0
-;  1   00:24:22    7349      0   12:27:40  59726      0
+ 2021 AOC Problem 4.1 = 49686
+ 2021 AOC Problem 4.2 = 26878
+ cpu time: 29 real time: 31 gc time: 0
+
+ Real world timing
+
+      --------Part 1---------   --------Part 2--------
+Day       Time    Rank  Score       Time   Rank  Score
+  4       >24h   77972      0       >24h  75701      0
+  3       >24h  102352      0       >24h  88448      0
+  2   00:38:41   13051      0   01:06:26  14647      0
+  1   00:24:22    7349      0   12:27:40  59726      0
+|#
