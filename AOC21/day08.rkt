@@ -1,115 +1,19 @@
 #lang racket
-;  AOC 2021
-; Leo Laporte 10-Dec-2021
-; 
-; --- Day 8: Seven Segment Search ---
-; 
-; You barely reach the safety of the cave when the whale smashes into the cave mouth,
-; collapsing it. Sensors indicate another exit to this cave at a much greater depth,
-; so you have no choice but to press on.
-; 
-; As your submarine slowly makes its way through the cave system, you notice that the
-; four-digit seven-segment displays in your submarine are malfunctioning; they must
-; have been damaged during the escape. You'll be in a lot of trouble without them,
-; so you'd better figure out what's wrong.
-; 
-; Each digit of a seven-segment display is rendered by turning on or off any of seven
-; segments named a through g:
-; 
-;   0:      1:      2:      3:      4:
-;  aaaa    ....    aaaa    aaaa    ....
-; b    c  .    c  .    c  .    c  b    c
-; b    c  .    c  .    c  .    c  b    c
-;  ....    ....    dddd    dddd    dddd
-; e    f  .    f  e    .  .    f  .    f
-; e    f  .    f  e    .  .    f  .    f
-;  gggg    ....    gggg    gggg    ....
-; 
-;   5:      6:      7:      8:      9:
-;  aaaa    aaaa    aaaa    aaaa    aaaa
-; b    .  b    .  .    c  b    c  b    c
-; b    .  b    .  .    c  b    c  b    c
-;  dddd    dddd    ....    dddd    dddd
-; .    f  e    f  .    f  e    f  .    f
-; .    f  e    f  .    f  e    f  .    f
-;  gggg    gggg    ....    gggg    gggg
-; 
-; So, to render a 1, only segments c and f would be turned on; the rest would be off.
-; To render a 7, only segments a, c, and f would be turned on.
-; 
-; The problem is that the signals which control the segments have been mixed up on
-; each display. The submarine is still trying to display numbers by producing output
-; on signal wires a through g, but those wires are connected to segments randomly.
-; Worse, the wire/segment connections are mixed up separately for each four-digit display!
-; (All of the digits within a display use the same connections, though.)
-; 
-; So, you might know that only signal wires b and g are turned on, but that doesn't mean
-; segments b and g are turned on: the only digit that uses two segments is 1, so it must
-; mean segments c and f are meant to be on. With just that information, you still can't
-; tell which wire (b/g) goes to which segment (c/f). For that, you'll need to collect
-; more information.
-; 
-; For each display, you watch the changing signals for a while, make a note of all ten
-; unique signal patterns you see, and then write down a single four digit output value
-; (your puzzle input). Using the signal patterns, you should be able to work out which
-; pattern corresponds to which digit.
-; 
-; For example, here is what you might see in a single entry in your notes:
-; 
-; acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab |
-; cdfeb fcadb cdfeb cdbaf
-; 
-; (The entry is wrapped here to two lines so it fits; in your notes, it will all be on a
-; single line.)
-; 
-; Each entry consists of ten unique signal patterns, a | delimiter, and finally the four
-; digit output value. Within an entry, the same wire/segment connections are used (but
-; you don't know what the connections actually are). The unique signal patterns correspond
-; to the ten different ways the submarine tries to render a digit using the current
-; wire/segment connections. Because 7 is the only digit that uses three segments, dab
-; in the above example means that to render a 7, signal lines d, a, and b are on. Because
-; 4 is the only digit that uses four segments, eafb means that to render a 4, signal lines
-; e, a, f, and b are on.
-; 
-; Using this information, you should be able to work out which combination of signal
-; wires corresponds to each of the ten digits. Then, you can decode the four digit output
-; value. Unfortunately, in the above example, all of the digits in the output
-; value (cdfeb fcadb cdfeb cdbaf) use five segments and are more difficult to deduce.
-; 
-; For now, focus on the easy digits. Consider this larger example:
-; 
-; be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb |
-; fdgacbe cefdb cefbgd gcbe
-; edbfga begcd cbg gc gcadebf fbgde acbgfd abcde gfcbed gfec |
-; fcgedb cgb dgebacf gc
-; fgaebd cg bdaec gdafb agbcfd gdcbef bgcad gfac gcb cdgabef |
-; cg cg fdcagb cbg
-; fbegcd cbd adcefb dageb afcb bc aefdc ecdab fgdeca fcdbega |
-; efabcd cedba gadfec cb
-; aecbfdg fbg gf bafeg dbefa fcge gcbea fcaegb dgceab fcbdga |
-; gecf egdcabf bgf bfgea
-; fgeab ca afcebg bdacfeg cfaedg gcfdb baec bfadeg bafgc acf |
-; gebdcfa ecba ca fadegcb
-; dbcfg fgd bdegcaf fgec aegbdf ecdfab fbedc dacgb gdcebf gf |
-; cefg dcbef fcge gbcadfe
-; bdfegc cbegaf gecbf dfcage bdacg ed bedf ced adcbefg gebcd |
-; ed bcgafe cdgba cbgef
-; egadfb cdbfeg cegd fecab cgb gbdefca cg fgcdab egfdb bfceg |
-; gbdfcae bgc cg cgb
-; gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc |
-; fgae cfgab fg bagce
-; 
-; Because the digits 1, 4, 7, and 8 each use a unique number of segments, you should
-; be able to tell which combinations of signals correspond to those digits. Counting
-; only digits in the output values (the part after | on each line), in the above
-; example, there are 26 instances of digits that use a unique number of segments
-; (highlighted above).
-; 
-; In the output values, how many times do digits 1, 4, 7, or 8 appear?
-; 
+
+#|
+
+AOC 2021
+Leo Laporte 10-Dec-2021
+ 
+ --- Day 8: Seven Segment Search ---
+ 
+ In the output values, how many times do digits 1, 4, 7, or 8 appear?
+
+|#
 
 
-(require racket/file threading rackunit racket/set)
+(require threading
+         rackunit)
 
 ;; Well. That's a lot of narrative for a problem asking us to count string lengths.
 ;; Part two must be a doozy. Meanwhile...
@@ -158,99 +62,46 @@
   
 (time (printf "2021 AOC Problem 8.1 = ~a\n" (day8.1 input)))
 
-;  --- Part Two ---
-; 
-; Through a little deduction, you should now be able to determine the remaining digits.
-; Consider again the first example above:
-; 
-; acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab |
-; cdfeb fcadb cdfeb cdbaf
-; 
-; After some careful analysis, the mapping between signal wires and segments only make
-; sense in the following configuration:
-; 
-;  dddd
-; e    a
-; e    a
-;  ffff
-; g    b
-; g    b
-;  cccc
-; 
-; So, the unique signal patterns would correspond to the following digits:
-; 
-; acedgfb: 8
-; cdfbe: 5
-; gcdfa: 2
-; fbcad: 3
-; dab: 7
-; cefabd: 9
-; cdfgeb: 6
-; eafb: 4
-; cagedb: 0
-; ab: 1
-; 
-; Then, the four digits of the output value can be decoded:
-; 
-; cdfeb: 5
-; fcadb: 3
-; cdfeb: 5
-; cdbaf: 3
-; Therefore, the output value for this entry is 5353.
-; 
-; Following this same process for each entry in the second, larger example above,
-; the output value of each entry can be determined:
-; 
-; fdgacbe cefdb cefbgd gcbe: 8394
-; fcgedb cgb dgebacf gc: 9781
-; cg cg fdcagb cbg: 1197
-; efabcd cedba gadfec cb: 9361
-; gecf egdcabf bgf bfgea: 4873
-; gebdcfa ecba ca fadegcb: 8418
-; cefg dcbef fcge gbcadfe: 4548
-; ed bcgafe cdgba cbgef: 1625
-; gbdfcae bgc cg cgb: 8717
-; fgae cfgab fg bagce: 4315
-; 
-; Adding all of the output values in this larger example produces 61229.
-; 
-; For each entry, determine all of the wire/segment connections and decode the four-digit
-; output values. What do you get if you add up all of the output values?
-; 
+#|
+  --- Part Two ---
+ 
+ Through a little deduction, you should now be able to determine the remaining digits. 
+ For each entry, determine all of the wire/segment connections and decode the four-digit
+ output values. What do you get if you add up all of the output values?
 
+ NOTES
+ The real problem today is understanding the specification. Wow.
+ Let me see if I can re-state the problem more clearly
 
-;; NOTES
-;; The real problem today is understanding the specification. Wow.
-;; Let me see if I can re-state the problem more clearly
-;;
-;; We have 200 displays consisting of four 7-segment numbers (the problem input)
-;; Each display is mis-wired differently.
-;; For each display we have observations for 10 unique wire combos representing
-;; the digits 0 through 9. And, after the |, we have the four that are actually turned on
-;;
-;; The challenge is to figure out which letters correspond to which segments on each display.
-;;
-;; The big leap in part two comes after the words "careful analysis." So the first thing I have
-;; to figure out is the deductive process to match each string to a digit. And again this is
-;; different for each display. It's kind of like Mastermind. The first four digits we know...
-;;
-;;  wires  |  len  | digit |   segments    |  rule  
-;; -------------------------------------------------------------
-;; ab      |   2   |   1   |     3     6   |  length = 2      
-;; ab d    |   3   |   7   | 1   3     6   |  length = 3  
-;; ab  ef      4   |   4   |   2 3 4   6   |  length = 4      
-;; abcdefg |   7   |   8   | 1 2 3 4 5 6 7 |  length = 7
-;; abcd f  |   5   |   3   | 1   3 4   6 7 |  len (union d3 d1) = 5
-;; abcdef  |   6   |   9   | 1 2 3 4   6 7 |  (union d4 d3)
-;;  bcdef  |   5   |   5   | 1 2   4   6 7 |  len (union d4 d5) = 6
-;; a cd fg |   5   |   2   | 1   3 4 5   7 |  len = 5
-;;  bcdefg |   6   |   6   | 1 2   4 5 6 7 |  len (union d1 x) = 7
-;; abcde g |   6   |   0   | 1 2 3   5 6 7 |  len = 6
-;;
-;; OK now here we go. Honestly I bet this isn't much faster than just brute forcing the
-;; solution. There are only 7! tests x 200 measurements. It took me two days to figure
-;; out how to deduce the digits. This is likely a case of being too clever. Spend less
-;; time designing and let the computer do the work. Oh well.
+ We have 200 displays consisting of four 7-segment numbers (the problem input)
+ Each display is mis-wired differently.
+ For each display we have observations for 10 unique wire combos representing
+ the digits 0 through 9. And, after the |, we have the four that are actually turned on
+
+ The challenge is to figure out which letters correspond to which segments on each display.
+
+ The big leap in part two comes after the words "careful analysis." So the first thing I have
+ to figure out is the deductive process to match each string to a digit. And again this is
+ different for each display. It's kind of like Mastermind. The first four digits we know...
+
+  wires  |  len  | digit |   segments    |  rule  
+ -------------------------------------------------------------
+ ab      |   2   |   1   |     3     6   |  length = 2      
+ ab d    |   3   |   7   | 1   3     6   |  length = 3  
+ ab  ef      4   |   4   |   2 3 4   6   |  length = 4      
+ abcdefg |   7   |   8   | 1 2 3 4 5 6 7 |  length = 7
+ abcd f  |   5   |   3   | 1   3 4   6 7 |  len (union d3 d1) = 5
+ abcdef  |   6   |   9   | 1 2 3 4   6 7 |  (union d4 d3)
+  bcdef  |   5   |   5   | 1 2   4   6 7 |  len (union d4 d5) = 6
+ a cd fg |   5   |   2   | 1   3 4 5   7 |  len = 5
+  bcdefg |   6   |   6   | 1 2   4 5 6 7 |  len (union d1 x) = 7
+ abcde g |   6   |   0   | 1 2 3   5 6 7 |  len = 6
+
+ OK now here we go. Honestly I bet this isn't much faster than just brute forcing the
+ solution. There are only 7! tests x 200 measurements. It took me two days to figure
+ out how to deduce the digits. This is likely a case of being too clever. Spend less
+ time designing and let the computer do the work. Oh well.
+|# 
 
 ;; Problem input from adventofcode.com
 ;; convert the string into a list of lists
@@ -271,8 +122,8 @@
                                            (string-split (second x)))) _)))
 
 (define (day8.2 measurements)
-  (for/fold ([total 0]  ; keep track of sum of each readout
-             #:result total) ; return the total sum
+  (for/fold ([total 0]                   ; keep track of sum of each readout
+             #:result total)             ; return the total sum
             ([m (in-list measurements)]) ; work through the provided measurements
     ; each call to get-value returns the value of the 4-digit readout
     (values (+ total (get-value m))))) 
@@ -349,20 +200,25 @@
 
 (time (printf "2021 AOC Problem 8.2 = ~a\n" (day8.2 readings)))
 
-; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
-;2021 AOC Problem 8.1 = 301
-;cpu time: 0 real time: 0 gc time: 0
-;2021 AOC Problem 8.2 = 908067
-;cpu time: 6 real time: 6 gc time: 0 (it IS pretty fast though!)
+#|
 
-; Real world timing
-;      --------Part 1---------   --------Part 2--------
-;Day       Time    Rank  Score       Time   Rank  Score
-;  8       >24h   61217      0       >24h  55574      0
-;  7       >24h   68317      0       >24h  66595      0
-;  6       >24h   71604      0       >24h  67093      0
-;  5       >24h   71260      0       >24h  68517      0
-;  4       >24h   77972      0       >24h  75701      0
-;  3       >24h  102352      0       >24h  88448      0
-;  2   00:38:41   13051      0   01:06:26  14647      0
-;  1   00:24:22    7349      0   12:27:40  59726      0
+Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+
+2021 AOC Problem 8.1 = 301
+cpu time: 0 real time: 0 gc time: 0
+2021 AOC Problem 8.2 = 908067
+cpu time: 6 real time: 6 gc time: 0 (it IS pretty fast though!)
+
+ Real world timing
+
+      --------Part 1---------   --------Part 2--------
+Day       Time    Rank  Score       Time   Rank  Score
+  8       >24h   61217      0       >24h  55574      0
+  7       >24h   68317      0       >24h  66595      0
+  6       >24h   71604      0       >24h  67093      0
+  5       >24h   71260      0       >24h  68517      0
+  4       >24h   77972      0       >24h  75701      0
+  3       >24h  102352      0       >24h  88448      0
+  2   00:38:41   13051      0   01:06:26  14647      0
+  1   00:24:22    7349      0   12:27:40  59726      0
+|#
