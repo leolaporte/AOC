@@ -37,7 +37,7 @@ overcomplicate?
 #|==============================================================================|#
 
 ;; String String -> String
-;; combines two strings using snailfish math
+;; adds two strings using snailfish math
 (define (sn-add str1 str2)
   (string-append "[" str1 "," str2 "]"))
 
@@ -45,25 +45,72 @@ overcomplicate?
   (check-equal? (sn-add "[1,2]" "[[3,4],5]") "[[1,2],[[3,4],5]]"))
 
 #|
+If any pair is nested inside four pairs, the leftmost such pair explodes.
+
 To explode a pair, the pair's left value is added to the first regular
 number to the left of the exploding pair (if any), and the pair's right
 value is added to the first regular number to the right of the exploding
- pair (if any). Exploding pairs will always consist of two regular numbers.
+pair (if any). Exploding pairs will always consist of two regular numbers.
 Then, the entire exploding pair is replaced with the regular number 0.
 |#
 
+;; pre-compile regex patterns for explode
+
+; explode string into four parts: left-str, left-value, right-value, right-str
+; or #f if nothing to do
+(define splode (pregexp "^(\\[\\d*,*\\[\\d*,*\\[\\d*,*\\[\\d*,*)\\[(\\d),(\\d)\\](.*)$"))
+
+; find last digit in left part (if any)
+; three parts: left fragment, digit, remaining chars, or #f if no digit
+(define split-left (pregexp "^(\\[\\d*,*\\[\\d*,*\\[\\d*,*\\[)(\\d)(.*)"))
+
+; find first digit in right part (if any)
+; three parts: left fragment of right, digit, right fragment, or #f if no digit
+(define split-right (pregexp "([^0-9]*)(\\d)(.*)$"))
+
 ; String -> String
 ; explodes a string according to the rules
-(define (sn-explode str) "") ;stub
-
+(define (sn-explode str)
+  (let ([part (regexp-match splode str)])
+    (cond [(false? part) str] ; string is fully reduced, so return it
+          [else               ; work with the parts of the string
+           (let* ([left (second part)]                ; left side of string
+                  [d1 (string->number (third part))]  ; left value
+                  [d2 (string->number (fourth part))] ; right value
+                  [right (fifth part)]                ; right side of string
+                  [left-left (regexp-match split-left left)]
+                  [right-right (regexp-match split-right right)])
+             
+            ; (sn-explode      ; do it again (until fully reduced)
+              (string-append  ; assemble exploded string
+               ; first the left side
+               (if (false? left-left)
+                   left   ; no number on this side so just use it unchanged
+                   (string-append (second left-left) ; otherwise add the left value and rightmost digit
+                                  (number->string (+ d1 (string->number (third left-left))))
+                                  (fourth left-left)))
+               ; now the middle
+               "0"
+               
+               ; and the right
+               (if (false? right-right)
+                   right   ; no number on this side so just use it unchanged
+                   (string-append (second right-right)
+                                  (number->string (+ d2 (string->number (third right-right))))
+                                  (fourth right-right)))))])))
+                  
 (module+ test
   (check-equal? (sn-explode "[[[[[9,8],1],2],3],4]") "[[[[0,9],2],3],4]")
   (check-equal? (sn-explode "[7,[6,[5,[4,[3,2]]]]]") "[7,[6,[5,[7,0]]]]")
   (check-equal? (sn-explode "[[6,[5,[4,[3,2]]]],1]") "[[6,[5,[7,0]]],3]")
   (check-equal? (sn-explode "[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]") "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]")
-  (check-equal? (sn-explode "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]") "[[3,[2,[8,0]]],[9,[5,[7,0]]]]"))
+  (check-equal? (sn-explode "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]") "[[3,[2,[8,0]]],[9,[5,[7,0]]]]")
+  (check-equal? (sn-explode "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]") "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]"))
+
 
 #|
+If any regular number is 10 or greater, the leftmost such regular number splits.
+
 To split a regular number, replace it with a pair; the left element of the pair
 should be the regular number divided by two and rounded down, while the right
 element of the pair should be the regular number divided by two and rounded up.
@@ -92,10 +139,36 @@ regular number is just that number
 
 (module+ test
   (check-equal? (sn-magnitude "[[[[6,6],[7,6]],[[7,7],[7,0]]],[[[7,7],[7,7]],[[7,8],[9,9]]]]") 4140)
-  (check-equal? (sn-magnitude "") ""))
+  (check-equal? (sn-magnitude "[9,1],[1,9]]") 129)
+  (check-equal? (sn-magnitude "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]") 1384)
+  (check-equal? (sn-magnitude "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]") 3488))
 
+#|
+To reduce a snailfish number, you must repeatedly do the first action in this list that
+applies to the snailfish number:
 
-; (time (printf "2021 AOC Problem 18.1 = ~a\n" (day18.1 input)))
+    If any pair is nested inside four pairs, the leftmost such pair explodes.
+    If any regular number is 10 or greater, the leftmost such regular number splits.
+
+Once no action in the above list applies, the snailfish number is reduced.
+
+During reduction, at most one action applies, after which the process returns to the
+top of the list of actions. For example, if split produces a pair that meets the explode
+criteria, that pair explodes before other splits occur.
+|#
+
+;; String -> String
+;; reduces a snailfish number according to the rules above
+(define (sn-reduce str) "") ; stub
+
+(module+ test
+  (check-equal? (sn-reduce "[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]") "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]")
+  (check-equal? (sn-reduce "") "")
+  (check-equal? (sn-reduce "") "")
+  (check-equal? (sn-reduce "") "")
+  (check-equal? (sn-reduce "") ""))
+
+; (time (printf "2021 AOC Problem 18.1 = ~a\n" (day18.1 (string-split (file->string "input18.txt") "\n"))))
 
 #|=================================================================================
                                         PART 2
