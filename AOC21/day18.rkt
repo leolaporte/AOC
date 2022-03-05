@@ -142,9 +142,10 @@ Then, the entire exploding pair is replaced with the regular number 0.
                        (number->string (+ d2 (string->number (third right-right))))
                        (fourth right-right))]
 
-                     [else "error: couldn't add left or right!"]))))])))
+                     [else (string-append left "0,0" right)]))))])))
   
 (module+ test
+  (check-equal? (sn-explode "[[[[[1,1]]]]]") "[[[[0,0]]]]") ; this condition is undefined
   (check-equal? (sn-explode "[[[[[9,8],1],2],3],4]") "[[[[0,9],2],3],4]")
   (check-equal? (sn-explode "[7,[6,[5,[4,[3,2]]]]]") "[7,[6,[5,[7,0]]]]")
   (check-equal? (sn-explode "[[6,[5,[4,[3,2]]]],1]") "[[6,[5,[7,0]]],3]")
