@@ -58,6 +58,8 @@ Then, the entire exploding pair is replaced with the regular number 0.
 ; leftmost pair to explode by counting the brackets (increasing with [ and
 ; decreasing with every ]) until I get to five (or reach the end of the str).
 
+; also, what happens if you can't add to the left OR right???? Undefined.
+
 ;; String -> String
 ;; given a string find a pair nested inside four pairs, returns
 ;; left side of string up to the pair, if no pair exists returns entire
@@ -69,7 +71,7 @@ Then, the entire exploding pair is replaced with the regular number 0.
 
             ([i (in-range (string-length str))])  ; iterate through string from L to R
     
-    #:break (equal? depth 5)                      ; or stop when nested 4 deep
+    #:break (equal? depth 5)                      ; stop when nested 4 deep
     
     (let ([c (substring str i (add1 i))])
       (values
@@ -87,23 +89,27 @@ Then, the entire exploding pair is replaced with the regular number 0.
 
 ; find last digit in left part (if any)
 ; four parts: whole string, left fragment, digit, remaining chars, or #f if no digit
-(define split-left (pregexp "^(\\[.*\\[.*\\[.*\\[)(\\d)(.*)"))
+(define split-left (pregexp "^(\\[.*\\[.*\\[.*\\[)(\\d+)(.*)"))
 
 ; find first digit in right part (if any)
 ; four parts: whole string, left fragment of right, digit, right fragment, or #f if no digit
-(define split-right (pregexp "([^0-9]*)(\\d)(.*)$"))
+(define split-right (pregexp "([^0-9]*)(\\d+)(.*)$"))
 
 ; get exploding pair 
-(define right-side (pregexp "(\\d),(\\d)\\](.*)$"))
+(define right-side (pregexp "(\\d+),(\\d+)\\](.*)$"))
 
 ; String -> String
-; explodes a string according to the rules
+; explodes a string according to the rules, continues exploding until fully reduced
 (define (sn-explode str)
   ; look for pair to explode
   (let ([left-side (find-pair str)]) 
     (cond [(equal? left-side str) str]                            ; no pair to explode so return str
           [else                                                   ; work with the parts of the string
-           
+           (printf "str: ~a\n left-side: ~a\n part: ~a\n\n"
+                   str
+                   left-side
+                   (regexp-match right-side (substring str (string-length left-side))))
+            
            ; let's explode - first get the parts to reassemble
            (let* ([llen (string-length left-side)]                
                   [left (substring left-side 0 (sub1 llen))]      ; chop off last [
@@ -170,7 +176,7 @@ For example, 10 becomes [5,5], 11 becomes [5,6], 12 becomes [6,6], and so on.
 (define double-d (pregexp "(^.*)(\\d{2,})(.*)$"))
 
 ; String -> String
-; splits a string according to the rules
+; splits a string according to the rules, splits once then returns
 (define (sn-split str)
   (let ([part (regexp-match double-d str)])  ; is there a doubled-number?
     (cond [(false? part) str]                ; nope, return string unmodified
@@ -207,30 +213,30 @@ criteria, that pair explodes before other splits occur.
 ;; String -> String
 ;; reduces a string by repeated applications of explode and split
 (define (sn-reduce str)
-  (let ([new-string (sn-split (sn-explode str))])
-    (cond [(equal? new-string str) str]
-          [else (sn-reduce new-string)])))
+  (let ([new-string (sn-split (sn-explode str))]) ; explode until can't, then split
+    (cond [(equal? new-string str) str]           ; once exploding and splitting do nothing, we're done
+          [else (sn-reduce new-string)])))        ; reduce some more
 
 (module+ test
   (check-equal? (sn-reduce "[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]") "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]"))
 
 
 ;; String String -> String
-;; adds two strings using snailfish math
+;; adds two strings using snailfish math, reducing after addition
 (define (sn-add str1 str2)
   (sn-reduce (string-append "[" str1 "," str2 "]")))
 
 (module+ test
   (check-equal? (sn-add "[1,2]" "[[3,4],5]") "[[1,2],[[3,4],5]]")
   (check-equal? (sn-add "[[[[4,3],4],4],[7,[[8,4],9]]]" "[1,1]") "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]")
-  (check-equal? (sn-add "[[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]"
-                        "[7,[[[3,7],[4,3]],[[6,3],[8,8]]]]")
+  (check-equal? (sn-add "[[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]" "[7,[[[3,7],[4,3]],[[6,3],[8,8]]]]")
                 "[[[[4,0],[5,4]],[[7,7],[6,0]]],[[8,[7,7]],[[7,9],[5,0]]]]"))
 
 ;; (list-of String) -> String
 ;; given a list of snailfish numbers return the sum of all the numbers
 (define (sn-add-list lst)
-  (foldl sn-add "" lst))
+  (let ([base (first lst)])
+    (foldl sn-add base (rest lst))))
 
 (module+ test
   (check-equal? (sn-add-list test-data) "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]"))
@@ -268,62 +274,4 @@ regular number is just that number
 #|
 Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
 
-
-; explode string into four parts: left-str, left-value, right-value, right-str
-; or #f if nothing to do - if lsplode fails, try rsplode
-; count brackets from left - if this doesn't work...
-(define lsplode (pregexp "^(\\[[^\\]]*\\[[^\\]]*\\[[^\\]]*\\[[^\\]]*)\\[(\\d),(\\d)\\](.*)$"))
-; ...then try counting brackets from right
-(define rsplode (pregexp "^(.*)\\[(\\d),(\\d)\\]([^\\[]*\\][^\\[]*\\][^\\[]*\\][^\\[]*\\])$"))
-
-; find last digit in left part (if any)
-; three parts: left fragment, digit, remaining chars, or #f if no digit
-(define split-left (pregexp "^(\\[.*\\[.*\\[.*\\[)(\\d)(.*)"))
-
-; find first digit in right part (if any)
-; three parts: left fragment of right, digit, right fragment, or #f if no digit
-(define split-right (pregexp "([^0-9]*)(\\d)(.*)$"))
-
-; String -> String
-; explodes a string according to the rules
-(define (sn-explode str)
-  ; look for pair to explode, left side first, then right side
-  (let ([part (or (regexp-match lsplode str) (regexp-match rsplode str))]) ; from L first, else from R
-    (cond [(false? part) str]                                     ; string is fully reduced, so return it
-          [else                                                   ; work with the parts of the string
-           ; let's explode - first get the parts to reassemble
-           (let* ([left (second part)]                            ; left side of string
-                  [d1 (string->number (third part))]              ; left value of pair
-                  [d2 (string->number (fourth part))]             ; right value of pair
-                  [right (fifth part)]                            ; right side of string
-                  ; now we have to figure out where to add, left or right?
-                  [left-left (regexp-match split-left left)]      ; is there a number to left?
-                  [right-right (regexp-match split-right right)]) ; is there a number to the right?
-
-
-             (sn-explode       ; keep exploding until it's fully reduced
-              (string-append   ; build the exploded string
-              
-               (cond [left-left   ; can we add to the left?
-                      (string-append
-                       (second left-left)  
-                       (number->string (+ d1 (string->number (third left-left))))
-                       ",0"
-
-                       (cond [right-right ; left added, right, too?
-                              (string-append 
-                               (second right-right) ;yes
-                               (number->string (+ d2 (string->number (third right-right))))
-                               (fourth right-right))]
-                             [else right]))] ; no adding to the right, just finish it off
-
-                     
-                     [right-right ; couldn't add to the left, can we add to the right?
-                      (string-append
-                       left
-                       "0,"
-                       (number->string (+ d2 (string->number (third right-right))))
-                       (fourth right-right))]
-
-                     [else "error: couldn't add left or right!"]))))])))
 |#
