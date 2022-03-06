@@ -23,8 +23,6 @@ Add up all of the snailfish numbers from the homework assignment in the order
 ; since we're working with strings a simple string-split on \n will do
 (define (snailify str) (string-split str "\n"))
 
-(define test-data (snailify "[[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]\n[7,[[[3,7],[4,3]],[[6,3],[8,8]]]]\n[[2,[[0,8],[3,4]]],[[[6,7],1],[7,[1,6]]]]\n[[[[2,4],7],[6,[0,5]]],[[[6,8],[2,8]],[[2,1],[4,5]]]]\n[7,[5,[[3,8],[1,4]]]]\n[[2,[2,2]],[8,[8,1]]]\n[2,9]\n[1,[[[9,3],9],[[9,0],[0,7]]]]\n[[[5,[7,4]],7],1]\n[[[[4,2],2],6],[8,7]]"))
-
 #|==============================================================================|#
 #|                                     NOTES                                    |#
 #|==============================================================================|#
@@ -53,7 +51,9 @@ Then, the entire exploding pair is replaced with the regular number 0.
 ; Unfortunately, while I can do everything else with regex I can't figure
 ; out how to find the exploding pairs when there's a mix of left and right
 ; brackets in the left hand expression, the latter cancelling the former. I don't
-; think any regex pattern can be guaranteed to find a quadrupally nested pair. 
+; think any regex pattern can be guaranteed to find a quadrupally nested pair
+; under those circumstances.
+;
 ; I'll have to write a function for sn-explode that will find the
 ; leftmost pair to explode by counting the brackets (increasing with [ and
 ; decreasing with every ]) until I get to five (or reach the end of the str).
@@ -105,11 +105,12 @@ Then, the entire exploding pair is replaced with the regular number 0.
   (let ([left-side (find-pair str)]) 
     (cond [(equal? left-side str) str]                            ; no pair to explode so return str
           [else                                                   ; work with the parts of the string
+
            ;           (printf "str: ~a\n left-side: ~a\n part: ~a\n\n"
            ;                   str
            ;                   left-side
            ;                   (regexp-match right-side (substring str (string-length left-side))))
-           ;            
+           ;                       
            ; let's explode - first get the parts to reassemble
            (let* ([llen (string-length left-side)]                
                   [left (substring left-side 0 (sub1 llen))]      ; chop off last [
@@ -218,8 +219,8 @@ criteria, that pair explodes before other splits occur.
           [else (sn-reduce new-string)])))        ; reduce some more
 
 (module+ test
-  (check-equal? (sn-reduce "[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]") "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]"))
-
+  (check-equal? (sn-reduce "[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]")
+                "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]"))
 
 ;; String String -> String
 ;; adds two strings using snailfish math, reducing after addition
@@ -237,6 +238,7 @@ criteria, that pair explodes before other splits occur.
   (check-equal? (sn-add "[[[[7,8],[6,7]],[[6,8],[0,8]]],[[[7,7],[5,0]],[[5,5],[5,6]]]]"
                         "[[[5,[7,4]],7],1]")
                 "[[[[7,7],[7,7]],[[8,7],[8,7]]],[[[7,0],[7,7]],9]]")
+  
   (check-equal? (sn-add "[[[[7,7],[7,7]],[[8,7],[8,7]]],[[[7,0],[7,7]],9]]"
                         "[[[[4,2],2],6],[8,7]]")
                 "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]"))
@@ -244,11 +246,37 @@ criteria, that pair explodes before other splits occur.
 ; (list-of String) -> String
 ; given a list of snailfish numbers return the sum of all the numbers
 (define (sn-add-list lst)
-  (let ([base (first lst)])
-    (foldl sn-add base (rest lst))))
+  (define (add-up total l)                                    
+    (cond [(empty? l) total]
+          [else (add-up (sn-add total (first l)) (rest l))]))
+  
+  (add-up (first lst) (rest lst)))
+
+(define test-data #<<here
+[[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]
+[7,[[[3,7],[4,3]],[[6,3],[8,8]]]]
+[[2,[[0,8],[3,4]]],[[[6,7],1],[7,[1,6]]]]
+[[[[2,4],7],[6,[0,5]]],[[[6,8],[2,8]],[[2,1],[4,5]]]]
+[7,[5,[[3,8],[1,4]]]]
+[[2,[2,2]],[8,[8,1]]]
+[2,9]
+[1,[[[9,3],9],[[9,0],[0,7]]]]
+[[[5,[7,4]],7],1]
+[[[[4,2],2],6],[8,7]])
+here
+  )
 
 (module+ test
-  (check-equal? (sn-add-list test-data) "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]"))
+  (check-equal? (sn-add-list (snailify "[1,1]\n[2,2]\n[3,3]\n[4,4]"))
+                "[[[[1,1],[2,2]],[3,3]],[4,4]]")
+  (check-equal? (sn-add-list (snailify "[1,1]\n[2,2]\n[3,3]\n[4,4]\n[5,5]"))
+                "[[[[3,0],[5,3]],[4,4]],[5,5]]")
+  (check-equal? (sn-add-list (snailify "[1,1]\n[2,2]\n[3,3]\n[4,4]\n[5,5]\n[6,6]"))
+                "[[[[5,0],[7,4]],[5,5]],[6,6]]")
+  
+  (check-equal? (sn-add-list (snailify test-data))
+                "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]"))
+
 
 #|
 The magnitude of a pair is 3 times the magnitude of its left element
@@ -256,18 +284,44 @@ plus 2 times the magnitude of its right element. The magnitude of a
 regular number is just that number
 |#
 
+; find first digit pair in a string
+; four parts: whole string, left fragment of right, digit, right fragment, or #f if no digit
+(define dp (pregexp "(.*?)\\[(\\d+),(\\d+)\\](.*)$"))
+
 ; String -> Natural
 ; calculates the magnitude of a string according to the rules
-(define (sn-magnitude str) 0) ;stub
+(define (sn-magnitude str)
+  (let ([part (regexp-match dp str)])
+    (cond [(false? part) (string->number str)]
+          [else
+           (sn-magnitude
+            (string-append
+             (second part)
+             (number->string
+              (+ (* 3 (string->number (third part)))
+                 (* 2 (string->number (fourth part)))))
+             (fifth part)))])))
 
-;(module+ test
-;  (check-equal? (sn-magnitude "[[[[6,6],[7,6]],[[7,7],[7,0]]],[[[7,7],[7,7]],[[7,8],[9,9]]]]") 4140)
-;  (check-equal? (sn-magnitude "[9,1],[1,9]]") 129)
-;  (check-equal? (sn-magnitude "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]") 1384)
-;  (check-equal? (sn-magnitude "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]") 3488))
+(module+ test
+  (check-equal? (sn-magnitude "[[[[6,6],[7,6]],[[7,7],[7,0]]],[[[7,7],[7,7]],[[7,8],[9,9]]]]") 4140)
+  (check-equal? (sn-magnitude "[[9,1],[1,9]]") 129)
+  (check-equal? (sn-magnitude "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]") 1384)
+  (check-equal? (sn-magnitude "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]") 3488)
+  (check-equal? (sn-magnitude "[[1,2],[[3,4],5]]") 143)
+  (check-equal? (sn-magnitude "[[[[1,1],[2,2]],[3,3]],[4,4]]") 445)
+  (check-equal? (sn-magnitude "[[[[3,0],[5,3]],[4,4]],[5,5]]") 791)
+  (check-equal? (sn-magnitude "[[[[5,0],[7,4]],[5,5]],[6,6]]") 1137))
 
+(define (day18.1 str)
+  (~> str
+      snailify
+      sn-add-list
+      sn-magnitude))
 
-; (time (printf "2021 AOC Problem 18.1 = ~a\n" (day18.1 (string-split (file->string "input18.txt") "\n"))))
+(module+ test
+  (check-equal? (day18.1 test-data) 4140))
+
+; (time (printf "2021 AOC Problem 18.1 = ~a\n" (day18.1 (file->string "input18.txt"))))
 
 #|=================================================================================
                                         PART 2
