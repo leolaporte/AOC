@@ -89,11 +89,11 @@ Then, the entire exploding pair is replaced with the regular number 0.
 
 ; find last digit in left part (if any)
 ; four parts: whole string, left fragment, digit, remaining chars, or #f if no digit
-(define split-left (pregexp "^(\\[.*\\[.*\\[.*\\[)(\\d+)(.*)"))
+(define split-left (pregexp "^(.*)(\\d+)(.*)$"))
 
 ; find first digit in right part (if any)
 ; four parts: whole string, left fragment of right, digit, right fragment, or #f if no digit
-(define split-right (pregexp "([^0-9]*)(\\d+)(.*)$"))
+(define split-right (pregexp "(.*?)(\\d+)(.*)$"))
 
 ; get exploding pair 
 (define right-side (pregexp "(\\d+),(\\d+)\\](.*)$"))
@@ -105,11 +105,11 @@ Then, the entire exploding pair is replaced with the regular number 0.
   (let ([left-side (find-pair str)]) 
     (cond [(equal? left-side str) str]                            ; no pair to explode so return str
           [else                                                   ; work with the parts of the string
-           (printf "str: ~a\n left-side: ~a\n part: ~a\n\n"
-                   str
-                   left-side
-                   (regexp-match right-side (substring str (string-length left-side))))
-            
+           ;           (printf "str: ~a\n left-side: ~a\n part: ~a\n\n"
+           ;                   str
+           ;                   left-side
+           ;                   (regexp-match right-side (substring str (string-length left-side))))
+           ;            
            ; let's explode - first get the parts to reassemble
            (let* ([llen (string-length left-side)]                
                   [left (substring left-side 0 (sub1 llen))]      ; chop off last [
@@ -171,9 +171,9 @@ element of the pair should be the regular number divided by two and rounded up.
 For example, 10 becomes [5,5], 11 becomes [5,6], 12 becomes [6,6], and so on.
 |#
 
-; first, a regular expression to find double digit numbers
-; creates a list of four parts: the string, the left half, the doubled number, the right half
-(define double-d (pregexp "(^.*)(\\d{2,})(.*)$"))
+; a regular expression to find the _first_ multiple digit number in a string
+; creates a list of four parts: the string, the left half, the multi-digit number, the right half
+(define double-d (pregexp "^(.*?)(\\d{2,})(.*)$"))
 
 ; String -> String
 ; splits a string according to the rules, splits once then returns
@@ -193,7 +193,7 @@ For example, 10 becomes [5,5], 11 becomes [5,6], 12 becomes [6,6], and so on.
               (fourth part)))])))
 
 (module+ test
-  (check-equal? (sn-split "[[[[0,7],4],[15,[0,2]]],[1,1]]") "[[[[0,7],4],[[7,8],[0,2]]],[1,1]]")
+  (check-equal? (sn-split "[[[[0,7],4],[15,[0,2]]],[17,1]]") "[[[[0,7],4],[[7,8],[0,2]]],[17,1]]")
   (check-equal? (sn-split "[[[[0,7],4],[[7,8],[0,13]]],[1,1]]") "[[[[0,7],4],[[7,8],[0,[6,7]]]],[1,1]]"))
 
 #|
@@ -230,10 +230,19 @@ criteria, that pair explodes before other splits occur.
   (check-equal? (sn-add "[1,2]" "[[3,4],5]") "[[1,2],[[3,4],5]]")
   (check-equal? (sn-add "[[[[4,3],4],4],[7,[[8,4],9]]]" "[1,1]") "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]")
   (check-equal? (sn-add "[[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]" "[7,[[[3,7],[4,3]],[[6,3],[8,8]]]]")
-                "[[[[4,0],[5,4]],[[7,7],[6,0]]],[[8,[7,7]],[[7,9],[5,0]]]]"))
-
-;; (list-of String) -> String
-;; given a list of snailfish numbers return the sum of all the numbers
+                "[[[[4,0],[5,4]],[[7,7],[6,0]]],[[8,[7,7]],[[7,9],[5,0]]]]")
+  (check-equal? (sn-add "[[[[4,0],[5,4]],[[7,7],[6,0]]],[[8,[7,7]],[[7,9],[5,0]]]]"
+                        "[[2,[[0,8],[3,4]]],[[[6,7],1],[7,[1,6]]]]")
+                "[[[[6,7],[6,7]],[[7,7],[0,7]]],[[[8,7],[7,7]],[[8,8],[8,0]]]]")
+  (check-equal? (sn-add "[[[[7,8],[6,7]],[[6,8],[0,8]]],[[[7,7],[5,0]],[[5,5],[5,6]]]]"
+                        "[[[5,[7,4]],7],1]")
+                "[[[[7,7],[7,7]],[[8,7],[8,7]]],[[[7,0],[7,7]],9]]")
+  (check-equal? (sn-add "[[[[7,7],[7,7]],[[8,7],[8,7]]],[[[7,0],[7,7]],9]]"
+                        "[[[[4,2],2],6],[8,7]]")
+                "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]"))
+ 
+; (list-of String) -> String
+; given a list of snailfish numbers return the sum of all the numbers
 (define (sn-add-list lst)
   (let ([base (first lst)])
     (foldl sn-add base (rest lst))))
