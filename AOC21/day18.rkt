@@ -1,7 +1,8 @@
 #lang racket
 
 ;AOC Day 18
-;Leo Laporte 12-Fen-2022
+;Leo Laporte 12-Feb-2022->7-Mar-2022
+; well, I didn't work on it EVERY day!
 
 #|==============================================================================
 
@@ -39,8 +40,6 @@
 [[[[5,2],5],[8,[3,7]]],[[5,[7,5]],[4,4]]]
 here
   )
-
-
 
 #|==============================================================================|#
 #|                                     NOTES                                    |#
@@ -369,9 +368,9 @@ regular number is just that number."
 ;; Given a list of snailfish numbers, produce a list the magnitudes produced
 ;; when when any two of the numbers are added together
 (define (make-magnitude-list los)
-   (for*/list ([i (in-range (length los))]
-               [j (in-range (length los))])
-     (sn-magnitude (sn-add (list-ref los i) (list-ref los j)))))
+  (for*/list ([i (in-range (length los))]
+              [j (in-range (length los))])
+    (sn-magnitude (sn-add (list-ref los i) (list-ref los j)))))
 
 (define (day18.2 str)
   (~> str
