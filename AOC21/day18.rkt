@@ -362,16 +362,34 @@ regular number is just that number."
 ==================================================================================|#
 
 ;; NOTE:  snailfish math is NOT commutative so we'll have  to add 1 + 2 AND 2 + 1)
-;; otherwise this is pretty easy.
+;; otherwise this is pretty easy. I'm kinda sad it takes so long though, 5 seconds
+;; easily my slowest day so far. 
 
+;; (list-of String) -> (list-of Natural)
+;; Given a list of snailfish numbers, produce a list the magnitudes produced
+;; when when any two of the numbers are added together
+(define (make-magnitude-list los)
+   (for*/list ([i (in-range (length los))]
+               [j (in-range (length los))])
+     (sn-magnitude (sn-add (list-ref los i) (list-ref los j)))))
 
+(define (day18.2 str)
+  (~> str
+      snailify
+      make-magnitude-list
+      (apply max _)))
 
-;;(module+ test
-;;  (check-equal? (day18.2 test-data) 0))
-;
-;; (time (printf "2021 AOC Problem 18.2 = ~a\n" (day18.2 input)))
-;
-;#|
-;Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
-;
-;|#
+(module+ test
+  (check-equal? (day18.2 test-data) 3993))
+
+(time (printf "2021 AOC Problem 18.2 = ~a\n" (day18.2 (file->string "input18.txt"))))
+
+#|
+Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+
+2021 AOC Problem 18.1 = 4480
+cpu time: 349 real time: 366 gc time: 12
+2021 AOC Problem 18.2 = 4676
+cpu time: 5369 real time: 5455 gc time: 369
+
+|#
