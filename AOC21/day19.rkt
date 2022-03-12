@@ -29,10 +29,11 @@ How many beacons are there?"
 ;; calculated distances to all other beacons that scanner sees, and a list
 ;; of all the scanners that can see it
 
-(struct scanner (id x y z beacons) #:mutable #:transparent)
-;; (scanner Byte Integer Integer Integer (listof Beacon))
+(struct scanner (id x y z roll pitch yaw beacons) #:mutable #:transparent)
+;; (scanner Byte Integer Integer Integer Integer Integer Integer (listof Beacon))
 ;; each scanner has a unique id, an x y z position relative to 0,0,0
-;; in the space, and a list of beacons it can see
+;; in the space, its orientation in the space (as described by roll
+;; pitch and yaw) and a list of beacons it can see
 
 (define (import-beacons str)
   (~> str
@@ -49,6 +50,7 @@ How many beacons are there?"
     (scanner
      id
      0 0 0  ; we don't yet know its absolute coordinates
+     0 0 0  ; nor roll pitch or yaw
      (build-beacon-list (rest l) id))))                 ; add the beacon list
 
 ;; the regexp for separating the beacon coordinates
@@ -109,7 +111,7 @@ beacons the problem set refers to.)
 ;; given two points in a three-dimensional space, return
 ;; the distance between the points
 (define (dist x1 y1 z1 x2 y2 z2)
-  (integer-sqrt (+ (sqr (- x2 x1)) (sqr (- y2 y1)) (sqr (- z2 z1))))) ; round down
+  (sqrt (+ (sqr (- x2 x1)) (sqr (- y2 y1)) (sqr (- z2 z1))))) ; round down
 
 ;; (listof Scanner) -> (listof Scanner)
 ;; Given a list of scanner entries (formatted as above) calculate
@@ -121,6 +123,7 @@ beacons the problem set refers to.)
       (scanner                                    ; create a new scanner
        (scanner-id s)                             ; with stuff we know
        (scanner-x s) (scanner-y s) (scanner-z s)  ; ditto
+       (scanner-roll s) (scanner-pitch s) (scanner-yaw s) ; ditto
        (beacon-dists (scanner-beacons s))))))     ; and a list of beacons with distances
 
 ;; (listof Beacon) -> (listof Beacon)
