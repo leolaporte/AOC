@@ -251,4 +251,11 @@ cpu time: 0 real time: 1 gc time: 0
 2021 AOC Problem 17.2 = 1919
 cpu time: 56 real time: 56 gc time: 5 (with provided target data performs 45,050 iterations)
 
+2022 Mac Studio Max with 32GB RAM
+
+2021 AOC Problem 16.1 = 3570
+cpu time: 0 real time: 0 gc time: 0
+2021 AOC Problem 17.2 = 1919
+cpu time: 93 real time: 80 gc time: 54
+
 |#

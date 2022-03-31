@@ -232,5 +232,13 @@ Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
 cpu time: 0 real time: 0 gc time: 0
 2021 AOC Problem 14.2 = 4332887448171
 cpu time: 2 real time: 2 gc time: 0
+
+2022 Mac Studio Max with 32GB RAM
+
+2021 AOC Problem 14.1 = 3118
+cpu time: 0 real time: 0 gc time: 0
+2021 AOC Problem 14.2 = 4332887448171
+cpu time: 6 real time: 6 gc time: 2
+
 ################################################################################
 |#

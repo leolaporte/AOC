@@ -70,6 +70,7 @@ How many beacons are there?"
        (make-hash)                      ; distances hash: key is other beacon, val is dist
        (list id)))))                    ; list of scanners starting with the source
 
+
 #|==============================================================================|#
 #|                                     NOTES                                    |#
 #|==============================================================================|#
@@ -109,9 +110,11 @@ beacons the problem set refers to.)
 
 ;; Integer Integer Integer Integer Integer Integer -> Integer
 ;; given two points in a three-dimensional space, return
-;; the distance between the points
+;; the distance between the points (well actually not,
+;; the actual distance would be the square root of the sum
+;; but there's no need for that. I'll keep it an integer.)
 (define (dist x1 y1 z1 x2 y2 z2)
-  (sqrt (+ (sqr (- x2 x1)) (sqr (- y2 y1)) (sqr (- z2 z1))))) ; round down
+   (+ (sqr (- x2 x1)) (sqr (- y2 y1)) (sqr (- z2 z1)))) 
 
 ;; (listof Scanner) -> (listof Scanner)
 ;; Given a list of scanner entries (formatted as above) calculate
@@ -144,193 +147,64 @@ beacons the problem set refers to.)
       
        (beacon-scanners s)))))                    ; more stuff we already know
 
-;; (listof Scanner) -> (setof Integer)
-;; Given a list of scanners return the set of unique
-;; beacon distances
-(define (make-unique-distance-set los)
-  (cond [(empty? los) (set)]
-        [else (set-union (walk-beacons (scanner-beacons (first los)))
-                         (make-unique-distance-set (rest los)))]))
-
-;; (listof Beacon) -> (setof Integer)
-;; given a list of beacons return a set of unique
-;; beacon distances
-(define (walk-beacons lob)
-  (cond [(empty? lob) (set)]
-        [else 
-         (set-union
-          (list->set (hash-values (beacon-distances (first lob))))
-          (walk-beacons (rest lob)))]))
-
-(define (day19.1 str)
-  (~> str
-      import-beacons            ; convert the string into a list of Scanner
-      calculate-distances       ; populate list with inter-beacon distances
-      make-unique-distance-set  ; create set of unique distances between beacons
-      set->list                 ; convert to list so we can...
-      length                    ; ...count it
-  ))
+;; NOTES:
+;; Now to populate beacon-scanners with the ID of every scanner that can see a given beacon
+;; I will assume that the beacon is shared by a scanner if more than MIN-MATCHES of distances
+;; match between two beacons.
+;;
+;; Once I KNOW a beacon is seen by two different scanners I can adjust the second scanner's position
+;; and orientation relative to scanner 0 using the two sets of coordinates for that beacon.
 
 
-(module+ test
-  (check-equal? (day19.1 test-data) 79))
+;(define (beacon-matches scanners)
+;  (for/list (scanner (in-range (length scanners)))
+;    (let ([s (list-ref scanners scanner)])
+;      (for/hash (beacon (in-range (length (scanner-beacons s))))
+;        (let ([b (list-ref (scanner-beacons s))])
+;          (values (cons (scanner-id s) (beacon-id b))
+;                  (shared-dists (hash-values (beacon-distances b)))))))))
 
-(time (printf "2021 AOC Problem 19.1 = ~a\n" (day19.1 (file->string "input19.txt"))))
+;; (listof Natural) -> (listof cons)
+;; Given a list of a beacon's distances to other points in its space
+;; return a list of scanner.beacon pairs that have MIN-MATCHES or more points
+;; in common
+(define MIN-MATCHES 6)
 
-#|=================================================================================
+
+ 
+
+
+  (define (day19.1 str)
+    (~> str
+        import-beacons            ; convert the string into a list of Scanner
+        calculate-distances       ; populate list with inter-beacon distances
+        ))
+
+(require "test-data-19.rkt")
+
+(define s (day19.1 test-data))
+(define bs (scanner-beacons (first s)))
+
+
+  ;(module+ test
+  ;  (check-equal? (day19.1 test-data) 79))
+  ;
+  ;(time (printf "2021 AOC Problem 19.1 = ~a\n" (day19.1 (file->string "input19.txt"))))
+
+  #|=================================================================================
                                         PART 2
                                
 
 ==================================================================================|#
 
-;(module+ test
-;  (check-equal? (day19.2 test-data) 0))
+  ;(module+ test
+  ;  (check-equal? (day19.2 test-data) 0))
 
-; (time (printf "2021 AOC Problem 19.2 = ~a\n" (day19.2 input)))
+  ; (time (printf "2021 AOC Problem 19.2 = ~a\n" (day19.2 input)))
 
-#|
+  #|
 Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
 
 
 
 |#
-
-(define test-data #<<here
---- scanner 0 ---
-404,-588,-901
-528,-643,409
--838,591,734
-390,-675,-793
--537,-823,-458
--485,-357,347
--345,-311,381
--661,-816,-575
--876,649,763
--618,-824,-621
-553,345,-567
-474,580,667
--447,-329,318
--584,868,-557
-544,-627,-890
-564,392,-477
-455,729,728
--892,524,684
--689,845,-530
-423,-701,434
-7,-33,-71
-630,319,-379
-443,580,662
--789,900,-551
-459,-707,401
-
---- scanner 1 ---
-686,422,578
-605,423,415
-515,917,-361
--336,658,858
-95,138,22
--476,619,847
--340,-569,-846
-567,-361,727
--460,603,-452
-669,-402,600
-729,430,532
--500,-761,534
--322,571,750
--466,-666,-811
--429,-592,574
--355,545,-477
-703,-491,-529
--328,-685,520
-413,935,-424
--391,539,-444
-586,-435,557
--364,-763,-893
-807,-499,-711
-755,-354,-619
-553,889,-390
-
---- scanner 2 ---
-649,640,665
-682,-795,504
--784,533,-524
--644,584,-595
--588,-843,648
--30,6,44
--674,560,763
-500,723,-460
-609,671,-379
--555,-800,653
--675,-892,-343
-697,-426,-610
-578,704,681
-493,664,-388
--671,-858,530
--667,343,800
-571,-461,-707
--138,-166,112
--889,563,-600
-646,-828,498
-640,759,510
--630,509,768
--681,-892,-333
-673,-379,-804
--742,-814,-386
-577,-820,562
-
---- scanner 3 ---
--589,542,597
-605,-692,669
--500,565,-823
--660,373,557
--458,-679,-417
--488,449,543
--626,468,-788
-338,-750,-386
-528,-832,-391
-562,-778,733
--938,-730,414
-543,643,-506
--524,371,-870
-407,773,750
--104,29,83
-378,-903,-323
--778,-728,485
-426,699,580
--438,-605,-362
--469,-447,-387
-509,732,623
-647,635,-688
--868,-804,481
-614,-800,639
-595,780,-596
-
---- scanner 4 ---
-727,592,562
--293,-554,779
-441,611,-461
--714,465,-776
--743,427,-804
--660,-479,-426
-832,-632,460
-927,-485,-438
-408,393,-506
-466,436,-512
-110,16,151
--258,-428,682
--393,719,612
--211,-452,876
-808,-476,-593
--575,615,604
--485,667,467
--680,325,-822
--627,-443,-432
-872,-547,-609
-833,512,582
-807,604,487
-839,-516,451
-891,-625,532
--652,-548,-490
-30,-46,-14
-here
-  )

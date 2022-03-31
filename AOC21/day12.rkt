@@ -180,8 +180,20 @@
 
 (time (printf "2021 AOC Problem 12.2 = ~a\n" (day12.2 full)))
 
-; Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+#|
+Time to solve, in milliseconds, on a 2021 M1 Pro MacBook Pro 14" with 16GB RAM
+
 ;2021 AOC Problem 12.1 = 5756
 ;cpu time: 11 real time: 12 gc time: 0
 ;2021 AOC Problem 12.2 = 144603
 ;cpu time: 530 real time: 579 gc time: 19
+
+2022 Mac Studio Max with 32GB RAM
+
+2021 AOC Problem 12.1 = 5756
+cpu time: 75 real time: 70 gc time: 62
+2021 AOC Problem 12.2 = 144603
+cpu time: 352 real time: 370 gc time: 7
+
+|#
+

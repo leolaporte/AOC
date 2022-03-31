@@ -335,4 +335,12 @@ cpu time: 443 real time: 451 gc time: 97
 2021 AOC Problem 13.2 = #<void>
 cpu time: 784 real time: 793 gc time: 175
 
+
+2022 Mac Studio Max with 32GB RAM
+
+2021 AOC Problem 13.1 = 755
+cpu time: 260 real time: 268 gc time: 84
+2021 AOC Problem 13.2 = #<void>
+cpu time: 380 real time: 394 gc time: 77
+
 |#

@@ -303,4 +303,11 @@ cpu time: 6 real time: 6 gc time: 3
 2021 AOC Problem 16.2 = 7936430475134
 cpu time: 2 real time: 2 gc time: 0
 
+2022 Mac Studio Max with 32GB RAM
+
+2021 AOC Problem 16.1 = 989
+cpu time: 1 real time: 1 gc time: 0
+2021 AOC Problem 16.2 = 7936430475134
+cpu time: 1 real time: 1 gc time: 0
+
 |#
