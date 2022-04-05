@@ -90,10 +90,10 @@ and eliminate scanners that are counted more than once. So...
 1. Import all the data making a list of scanners and their beacons
 2. Create a set of distances for every scanner/beacon to all the other scanner/beacons 
 3. When there's overlap of >5? points (we'll have to look at the data to get
-an idea of this number) that's a duplicate beacon. Make a list of all the
-beacons and all the scanners that can see it. 
+an idea of this number) that's a duplicate beacon. Create a list of unique
+beacons by consolidating duplicates.
 
-At the end of this process, count the beacons, eliminating duplicates.
+At the end of this process, count the beacons.
 
 |#
 
@@ -139,7 +139,7 @@ At the end of this process, count the beacons, eliminating duplicates.
                  (let ([d (list-ref bs dest)])
                    (fingerprint s d))))))))        
 
-;; NOTES: Now I can walk the scanner list and make a list of unique beacon IDS.
+;; NOTES: Now I can walk the scanner list and make a list of unique beacon IDs.
 ;; Beacons with the same fingerprint will be concatenated into a single list
 ;; inside the list of beacons. e.g. if 3 4 and 5 are the same beacon return
 ;; the list '(1 2 '(3 4 5) 6 7)
@@ -160,7 +160,7 @@ At the end of this process, count the beacons, eliminating duplicates.
 ;; Given a list of beacons consolidate it so each item in the list
 ;; is a list of beacon ids that match a single beacon
 (define (combine-dupes beacons deduped)
-  (cond [(empty? beacons) deduped]
+  (cond [(empty? beacons) deduped]            ; return the final, deduped, list
         [else
          (combine-dupes                       ; recurse with...
           
@@ -173,33 +173,43 @@ At the end of this process, count the beacons, eliminating duplicates.
            deduped))]))                       ; onto the list of deduped beacons
        
 ;; Beacon Beacon -> Boolean
-;; returns true if two beacons have more than MIN-MATCHES shared
+;; returns true if two beacons have at least MIN-MATCHES shared
 ;; distance fingerprints
-(define MIN-MATCHES 4)
+(define MIN-MATCHES 2) ; Hunh. That's lower than I would have thought. 
 
 (define (beacons-match? b1 b2)
-  (> (length (set-intersect (beacon-distances b1) (beacon-distances b2))) MIN-MATCHES)) 
+  (>= (length (set-intersect (beacon-distances b1) (beacon-distances b2))) MIN-MATCHES)) 
 
-(define (day19.1 str)
+(define (make-beacon-list str)
   (~> str
-      import-beacons            ; convert the string into a list of Scanner
-      calculate-distances       ; populate list with inter-beacon distances
-      flatten-beacons           ; create a list of all beacons
-      (combine-dupes _ empty)   ; combine it into a unique list
-      length))                  ; so how many is that?
-
+      import-beacons              ; convert the string into a list of Scanner
+      calculate-distances         ; populate list with inter-beacon distances
+      flatten-beacons             ; create a list of all beacons
+      (combine-dupes _ empty)))   ; combine it into a unique list
+ 
 (require "test-data-19.rkt")
+(define TEST-BEACONS (make-beacon-list test-data))
 
 (module+ test
-  (check-equal? (day19.1 test-data) 79))
+  (check-equal? (length TEST-BEACONS) 79))
 
-(time (printf "2021 AOC Problem 19.1 = ~a\n" (day19.1 (file->string "input19.txt"))))
+(time
+ (define INPUT-BEACONS (make-beacon-list (file->string "input19.txt")))
+ (printf "2021 AOC Problem 19.1 = ~a\n" (length INPUT-BEACONS)))
 
 #|=================================================================================
                                         PART 2
-                               
+
+"Using the Manhattan distance, how far apart do the scanners get?"
 
 ==================================================================================|#
+
+;; NOTES:
+;; So now that I have a list of overlapping beacons I can use them to calculate
+;; the absolute positions and rotations of each scanner. Once I know that I can
+;; normalize the positions of the beacons. Then I can calculate the maximum distances.
+
+
 
 ;(module+ test
 ;  (check-equal? (day19.2 test-data) 0))
