@@ -28,11 +28,10 @@ How many beacons are there?"
 ;; each beacon has a unique id, its (relative to its scanner) x y z position,
 ;; calculated distances to all other beacons that scanner sees
 
-(struct scanner (id x y z roll pitch yaw beacons) #:mutable #:transparent)
+(struct scanner (id x y z beacons) #:mutable #:transparent)
 ;; (scanner Byte Integer Integer Integer Integer Integer Integer (listof Beacon))
 ;; each scanner has a unique id, an x y z position relative to 0,0,0
-;; in the space, its orientation in the space (as described by roll
-;; pitch and yaw) and a list of beacons it can see
+;; in the space, and a list of beacons it can see
 
 (define (import-beacons str)
   (~> str
@@ -49,7 +48,6 @@ How many beacons are there?"
     (scanner
      id
      0 0 0  ; we don't yet know its absolute coordinates
-     0 0 0  ; nor roll pitch or yaw
      (build-beacon-list (rest l) id))))  ; add the beacon list
 
 ;; the regexp for separating the beacon coordinates
@@ -66,7 +64,7 @@ How many beacons are there?"
        (string->number (first part))    ; x 
        (string->number (second part))   ; y 
        (string->number (third part))    ; z
-       empty))))                        ; list of distances to other beacons
+       empty))))                        ; will hold the list of distances to other beacons
 
 
 #|==============================================================================|#
@@ -85,7 +83,7 @@ of finding the exact position of each beacon - is that really necessary?
 
 If I calculate the distances between all the beacons seen by a given scanner,
 I think that should be a way to compare beacons belonging to multiple scanners
-and eliminate scanners that are counted more than once. So...
+and consolidate beacons that are seen by multiple scanners. So...
 
 1. Import all the data making a list of scanners and their beacons
 2. Create a set of distances for every scanner/beacon to all the other scanner/beacons 
@@ -93,7 +91,7 @@ and eliminate scanners that are counted more than once. So...
 an idea of this number) that's a duplicate beacon. Create a list of unique
 beacons by consolidating duplicates.
 
-At the end of this process, count the beacons.
+At the end of this process, count the distinct beacons.
 
 |#
 
@@ -105,23 +103,24 @@ At the end of this process, count the beacons.
 ;; given two Beacons return the distance between the Beacons
 ;; (well no, the actual distance would be the square
 ;; root of the sum but there's no need for that. I'll keep it
-;; an integer.)
+;; an integer.) Interestingly the Manhattan distance isn't specific
+;; enough to work here so I'll use the square of the Euclidean distance.
 (define (fingerprint b1 b2)
-  (define-values (x1 y1 z1) (values (beacon-x b1) (beacon-y b1) (beacon-z b1)))
-  (define-values (x2 y2 z2) (values (beacon-x b2) (beacon-y b2) (beacon-z b2)))
-  (+ (sqr (- x2 x1)) (sqr (- y2 y1)) (sqr (- z2 z1))))
+  (+ (sqr (- (beacon-x b2) (beacon-x b1)))
+     (sqr (- (beacon-y b2) (beacon-y b1)))
+     (sqr (- (beacon-z b2) (beacon-z b1)))))
 
 ;; (listof Scanner) -> (listof Scanner)
-;; Given a list of scanner entries calculate
-;; the distances for each associated beacon to every other beacon
-;; and add them to the list of beacon-distances.
+;; Given a scanner calculate the distances for each beacon seen by that
+;; scanner to every other beacon seen by that scanner and make a list of
+;; inter-beacon-distances. Add that list to the scanner structure. Do
+;; this for all the scanners in the given list.
 (define (calculate-distances scanners)
   (for/list ([i (in-range (length scanners))])    ; for all the scanners in the list
     (let ([s (list-ref scanners i)])
       (scanner                                    ; create a new scanner
        (scanner-id s)                             ; with stuff we know
        (scanner-x s) (scanner-y s) (scanner-z s)  ; ditto
-       (scanner-roll s) (scanner-pitch s) (scanner-yaw s) ; ditto
        (beacon-dists (scanner-beacons s))))))     ; and a list of beacons with distances
 
 ;; (listof Beacon) -> (listof Beacon)
@@ -129,16 +128,16 @@ At the end of this process, count the beacons.
 ;; containing the distance between each beacon and all the other beacons. 
 (define (beacon-dists bs)
   (for/list ([source (in-range (length bs))])    ; for all the beacons in the list
-    (let ([s (list-ref bs source)])
+    (let ([s (list-ref bs source)])              ; build distances for source beacon
       (beacon                                    ; build a beacon structure
        (beacon-id s)                             ; with stuff we already know
        (beacon-x s) (beacon-y s) (beacon-z s)    ; ditto
-       
-       (remove 0                                 ; we don't need a beacon's dist to itself
-               (for/list ([dest (in-range (length bs))]) ; a list of calculated fingerprints
-                 (let ([d (list-ref bs dest)])
-                   (fingerprint s d))))))))        
-
+           
+       (remove 0                                 ; don't need dist to self
+               (for/list ([dest (in-range (length bs))])   ; add distances to other beacons
+                 (let ([d (list-ref bs dest)])         
+                   (fingerprint s d))))))))     ; calculate fingerprints
+ 
 ;; NOTES: Now I can walk the scanner list and make a list of unique beacon IDs.
 ;; Beacons with the same fingerprint will be concatenated into a single list
 ;; inside the list of beacons. e.g. if 3 4 and 5 are the same beacon return
@@ -156,22 +155,34 @@ At the end of this process, count the beacons.
 
 ;; Now find duplicates in that list
 
-;; (list-of Beacon) -> (list-of (list-of Beacons))
+;; (list-of Beacon) (list-of Beacon IDs) -> (list-of (list-of Beacon-id))
 ;; Given a list of beacons consolidate it so each item in the list
 ;; is a list of beacon ids that match a single beacon
-(define (combine-dupes beacons deduped)
-  (cond [(empty? beacons) deduped]            ; return the final, deduped, list
-        [else
-         (combine-dupes                       ; recurse with...
-          
-          (filter-not                         ; a list of the remaining, unmatched, beacons
-           (λ (b) (beacons-match? (first beacons) b)) beacons)
-          
-          (cons                               ; and accumulate the matching beacons
-           (map (λ (b) (beacon-id b))         ; well, just the ids 
-                (filter (λ (b) (beacons-match? (first beacons) b)) beacons)) ; matches
-           deduped))]))                       ; onto the list of deduped beacons
-       
+(define (combine-dupes beacons)
+  ;  (cond [(empty? beacons) deduped]            ; return the final, deduped, list
+  ;        [else
+  ;         (combine-dupes                       ; recurse with...
+  ;          
+  ;          (filter-not                         ; a list of the remaining, unmatched, beacons
+  ;           (λ (b) (beacons-match? (first beacons) b)) beacons)
+  ;          
+  ;          (cons                               ; and accumulate the matching beacons
+  ;           (map (λ (b) (beacon-id b))         ; well, just the ids 
+  ;                (filter (λ (b) (beacons-match? (first beacons) b)) beacons)) ; matches
+  ;           deduped))]))                       ; onto the list of deduped beacons
+
+
+  (for/fold ([deduped empty])
+            ([beacon (in-range (length beacons))])
+    (let ([b (list-ref beacons beacon)])
+      (values
+       (cons
+        (cons (beacon-id b)
+              (for/list ([other (in-range beacon (length beacons))])
+                (let ([r (list-ref beacons other)])
+                  (cond [(beacons-match? b r) (beacon-id r)]))))
+        deduped)))))
+        
 ;; Beacon Beacon -> Boolean
 ;; returns true if two beacons have at least MIN-MATCHES shared
 ;; distance fingerprints
@@ -185,17 +196,18 @@ At the end of this process, count the beacons.
       import-beacons              ; convert the string into a list of Scanner
       calculate-distances         ; populate list with inter-beacon distances
       flatten-beacons             ; create a list of all beacons
-      (combine-dupes _ empty)))   ; combine it into a unique list
+      combine-dupes               ; combine it into a unique list
+      )) 
  
 (require "test-data-19.rkt")
 (define TEST-BEACONS (make-beacon-list test-data))
 
-(module+ test
-  (check-equal? (length TEST-BEACONS) 79))
-
-(time
- (define INPUT-BEACONS (make-beacon-list (file->string "input19.txt")))
- (printf "2021 AOC Problem 19.1 = ~a\n" (length INPUT-BEACONS)))
+;(module+ test
+;  (check-equal? (length TEST-BEACONS) 79))
+;
+; (time
+; (define INPUT-BEACONS (make-beacon-list (file->string "input19.txt")))
+; (printf "2021 AOC Problem 19.1 = ~a\n" (length INPUT-BEACONS)))
 
 #|=================================================================================
                                         PART 2
@@ -205,11 +217,39 @@ At the end of this process, count the beacons.
 ==================================================================================|#
 
 ;; NOTES:
-;; So now that I have a list of overlapping beacons I can use them to calculate
-;; the absolute positions and rotations of each scanner. Once I know that I can
-;; normalize the positions of the beacons. Then I can calculate the maximum distances.
+;; So now that I have a list of duplicate beacons I can use them to calculate
+;; the absolute positions of each scanner. Then I can  calculate the manhattan
+;; distances between scanners and return the max distance.
 
+;; So job one: a function that takes a beacon's position seen from two scanners, one
+;; who's position is known and one unknown, then produces the 0-based coordinates
+;; for the second scanner.
 
+;; Beacon Beacon -> Natural Natural Natural
+;; given beacon readings from two scanners, one who's position is known
+;; and one not, return the position of the second scanner.
+
+(define S (import-beacons test-data))
+(define B (make-beacon-list test-data))
+
+;; Integer (list-of Scanner) -> Scanner
+;; given a Scanner id return the scanner structure
+(define (get-scanner id scanners)
+  (findf (λ (s) (equal? (scanner-id s) id)) scanners))
+
+;; Cons (list-of Scanner) -> Beacon
+;; given a Beacon id return the entire beacon structure
+(define (get-beacon id scanners)
+  (findf (λ (b) (equal? (beacon-id b) id))
+         (scanner-beacons (get-scanner (car id) scanners))))
+
+;; Beacon Beacon -> Integer
+;; given two XYZ positions, return the manhattan distance between
+;; the two points
+(define (manhattan b1 b2)
+  (+ (abs (- (beacon-x b1) (beacon-x b2)))
+     (abs (- (beacon-y b1) (beacon-y b2)))
+     (abs (- (beacon-z b1) (beacon-z b2)))))
 
 ;(module+ test
 ;  (check-equal? (day19.2 test-data) 0))
